@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const department_1 = require("../controllers/department");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+const controller = new department_1.DepartmentController();
+router.use(auth_1.authenticateJWT);
+router.use((0, auth_1.requireRole)(['Admin', 'Owner']));
+router.get('/', controller.list.bind(controller));
+router.get('/summary-stats', controller.getSummaryStats.bind(controller));
+router.get('/:id/details', controller.getDepartmentDetails.bind(controller));
+router.post('/', controller.create.bind(controller));
+router.put('/move-workers', controller.moveWorkers.bind(controller));
+router.put('/:id', controller.update.bind(controller));
+router.delete('/:id', controller.delete.bind(controller));
+exports.default = router;

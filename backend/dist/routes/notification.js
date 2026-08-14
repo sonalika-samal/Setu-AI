@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const notification_1 = require("../controllers/notification");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+const controller = new notification_1.NotificationController();
+router.use(auth_1.authenticateJWT);
+router.use((0, auth_1.requireRole)(['Admin', 'Owner']));
+router.get('/', controller.list.bind(controller));
+router.put('/read', controller.markAsRead.bind(controller));
+exports.default = router;

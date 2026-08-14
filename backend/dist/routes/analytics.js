@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const analytics_1 = require("../controllers/analytics");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+const controller = new analytics_1.AnalyticsController();
+router.use(auth_1.authenticateJWT);
+router.use((0, auth_1.requireRole)(['Admin', 'Owner']));
+router.get('/summary', controller.getSummary.bind(controller));
+router.get('/export', controller.exportReport.bind(controller));
+exports.default = router;

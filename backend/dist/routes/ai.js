@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const ai_1 = require("../controllers/ai");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+const controller = new ai_1.AIController();
+router.use(auth_1.authenticateJWT);
+router.use((0, auth_1.requireRole)(['Admin', 'Owner']));
+router.post('/chat', controller.chat.bind(controller));
+exports.default = router;
