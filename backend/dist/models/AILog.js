@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AILogModel = void 0;
 const mongoose_1 = require("mongoose");
 const AILogSchema = new mongoose_1.Schema({
+    orgId: { type: String, required: true, default: 'default', index: true },
     prompt: { type: String, required: true },
     response: { type: String, required: false },
     provider: { type: String, required: true },

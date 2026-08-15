@@ -19,49 +19,98 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const LogCleanupService_1 = require("./services/LogCleanupService");
 const ReminderService_1 = require("./services/ReminderService");
 const InactivityChecker_1 = require("./services/InactivityChecker");
+const Organisation_1 = require("./models/Organisation");
 let server;
 let io;
 const PORT = config_1.config.port;
 const userRepo = new UserRepository_1.UserRepository();
 const credentialRepo = new CredentialRepository_1.CredentialRepository();
+async function backfillOrgIds() {
+    try {
+        const modelsToBackfill = [
+            User_1.UserModel, Task_1.TaskModel, Department_1.DepartmentModel, Credential_1.CredentialModel,
+            require('./models/MessageLog').MessageLogModel,
+            require('./models/AILog').AILogModel,
+            require('./models/ActivityLog').ActivityLogModel,
+            require('./models/ErrorLog').ErrorLogModel,
+            require('./models/LoginHistory').LoginHistoryModel,
+            require('./models/RefreshToken').RefreshTokenModel,
+            require('./models/SecurityLog').SecurityLogModel,
+            require('./models/Notification').NotificationModel,
+            require('./models/TaskTimeline').TaskTimelineModel,
+            require('./models/WebhookLog').WebhookLogModel,
+        ];
+        for (const model of modelsToBackfill) {
+            if (model) {
+                await model.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'default' } });
+            }
+        }
+        logger_1.logger.info('[Migration]: Successfully backfilled missing orgId="default" on all legacy records.');
+    }
+    catch (err) {
+        logger_1.logger.error(`[Migration]: Failed to backfill orgId: ${err.message}`);
+    }
+}
 async function seedDatabase() {
     try {
+        // 0. Seed default Organisation
+        const defaultOrgExists = await Organisation_1.OrganisationModel.findOne({ orgId: 'default' });
+        if (!defaultOrgExists) {
+            logger_1.logger.info('Seeding default organisation into MongoDB...');
+            await Organisation_1.OrganisationModel.create({
+                orgId: 'default',
+                name: 'Default Organisation',
+                plan: 'enterprise',
+                isActive: true,
+                adminEmail: 'admin@setuai.com',
+            });
+            logger_1.logger.info('Default organisation seeded successfully.');
+        }
+        // 0.1 Seed SuperAdmin User
+        const superAdminUsername = process.env.SUPER_ADMIN_USERNAME || 'superadmin';
+        const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin@123!';
+        const superAdminExists = await User_1.UserModel.findOne({ username: superAdminUsername, role: 'SuperAdmin' });
+        if (!superAdminExists) {
+            logger_1.logger.info(`Seeding SuperAdmin user: ${superAdminUsername}`);
+            await User_1.UserModel.create({
+                orgId: 'platform',
+                username: superAdminUsername,
+                password: superAdminPassword,
+                name: 'Platform Super Admin',
+                phone: '+910000000000',
+                role: 'SuperAdmin',
+                status: 'Active',
+                account_status: 'Enabled'
+            });
+            logger_1.logger.info('SuperAdmin user seeded successfully.');
+        }
         // 1. Seed default Credentials document if it doesn't exist
-        const credentialsExists = await Credential_1.CredentialModel.findOne({ key: 'global_config' });
+        const credentialsExists = await Credential_1.CredentialModel.findOne({ orgId: 'default' }) || await Credential_1.CredentialModel.findOne({ key: 'global_config' });
         if (!credentialsExists) {
             logger_1.logger.info('Seeding default credentials into MongoDB...');
-            const defaultCreds = await credentialRepo.getCredentials();
-            await credentialRepo.updateCredentials(defaultCreds);
+            const defaultCreds = await credentialRepo.getCredentials('default');
+            await credentialRepo.updateCredentials(defaultCreds, 'default');
         }
         else {
-            // Synchronize key changes from .env to database in development
-            const currentCreds = await credentialRepo.getCredentials();
-            let hasUpdates = false;
-            if (!currentCreds.sarvam.apiKey && config_1.config.sarvam.apiKey) {
-                currentCreds.sarvam.apiKey = config_1.config.sarvam.apiKey;
-                hasUpdates = true;
-            }
-            if (!currentCreds.meta.accessToken && config_1.config.meta.accessToken) {
-                currentCreds.meta.accessToken = config_1.config.meta.accessToken;
-                hasUpdates = true;
-            }
-            if (hasUpdates) {
-                logger_1.logger.info('Syncing new secrets from .env into MongoDB credentials document...');
-                await credentialRepo.updateCredentials(currentCreds);
-            }
-            else {
-                logger_1.logger.info('Credentials config loaded and verified.');
+            // Ensure default googleClientId in database matches config from environment
+            const globalCreds = await Credential_1.CredentialModel.findOne({ orgId: 'default' }) || await Credential_1.CredentialModel.findOne({ key: 'global_config' });
+            if (globalCreds && (!globalCreds.googleClientId || globalCreds.googleClientId !== config_1.config.google?.clientId)) {
+                logger_1.logger.info('Updating googleClientId in database to match environment configuration...');
+                globalCreds.googleClientId = config_1.config.google?.clientId || '1234567890-placeholder.apps.googleusercontent.com';
+                await globalCreds.save();
             }
         }
         // 2. Seed default Administrator User (Username-based)
         const adminUsername = config_1.config.defaultAdmin.username || 'admin';
-        const adminExists = await userRepo.exists({ username: adminUsername });
-        if (!adminExists) {
+        let adminUser = await User_1.UserModel.findOne({ username: adminUsername, orgId: 'default' });
+        const newAdminPassword = config_1.config.defaultAdmin.password || 'AdminSecure2026#SetuAI_!$';
+        if (!adminUser) {
             logger_1.logger.info(`Seeding default administrator user: ${adminUsername}`);
-            await userRepo.create({
+            await User_1.UserModel.create({
+                orgId: 'default',
                 username: adminUsername,
-                password: config_1.config.defaultAdmin.password || 'AdminPassword123!',
-                name: 'Sahayak Admin',
+                password: newAdminPassword,
+                name: 'Setu AI Admin',
                 phone: '+919999999999',
                 role: 'Admin',
                 status: 'Active',
@@ -69,17 +118,26 @@ async function seedDatabase() {
             logger_1.logger.info('Administrator user seeded successfully.');
         }
         else {
-            logger_1.logger.info(`Administrator user already exists: ${adminUsername}`);
+            // Check if they have the old weak default password and upgrade them
+            const isWeak = await adminUser.comparePassword('AdminPassword123!');
+            const isOldSecure = await adminUser.comparePassword('AdminSecure2026');
+            if (isWeak || isOldSecure) {
+                logger_1.logger.info(`Upgrading weak default password for administrator user: ${adminUsername}`);
+                adminUser.password = newAdminPassword;
+                await adminUser.save();
+            }
         }
         // 3. Seed default Owner User (Username-based)
         const ownerUsername = 'owner';
-        const ownerExists = await userRepo.exists({ username: ownerUsername });
-        if (!ownerExists) {
+        let ownerUser = await User_1.UserModel.findOne({ username: ownerUsername, orgId: 'default' });
+        const newOwnerPassword = 'OwnerSecure2026#SetuAI_!$';
+        if (!ownerUser) {
             logger_1.logger.info(`Seeding default owner user: ${ownerUsername}`);
-            await userRepo.create({
+            await User_1.UserModel.create({
+                orgId: 'default',
                 username: ownerUsername,
-                password: 'OwnerPassword123!',
-                name: 'Sahayak Owner',
+                password: newOwnerPassword,
+                name: 'Setu AI Owner',
                 phone: '+918888888888',
                 role: 'Owner',
                 status: 'Active',
@@ -87,7 +145,34 @@ async function seedDatabase() {
             logger_1.logger.info('Owner user seeded successfully.');
         }
         else {
-            logger_1.logger.info(`Owner user already exists: ${ownerUsername}`);
+            // Check if they have the old weak default password and upgrade them
+            const isWeak = await ownerUser.comparePassword('OwnerPassword123!');
+            if (isWeak) {
+                logger_1.logger.info(`Upgrading weak default password for owner user: ${ownerUsername}`);
+                ownerUser.password = newOwnerPassword;
+                await ownerUser.save();
+            }
+        }
+        // Ensure there is only one Owner login in the system
+        const deleteOwnersResult = await User_1.UserModel.deleteMany({ role: 'Owner', username: { $ne: ownerUsername } });
+        if (deleteOwnersResult.deletedCount > 0) {
+            logger_1.logger.info(`Cleaned up ${deleteOwnersResult.deletedCount} extra owner login(s) to enforce a single owner system.`);
+        }
+        // 4. Update any existing users with name containing "Sahayak" to "Setu AI"
+        try {
+            await User_1.UserModel.updateMany({ name: /Sahayak/i }, [
+                {
+                    $set: {
+                        name: {
+                            $replaceAll: { input: "$name", find: "Sahayak", replacement: "Setu AI" }
+                        }
+                    }
+                }
+            ]);
+            logger_1.logger.info('Existing user records containing "Sahayak" normalized to "Setu AI" successfully.');
+        }
+        catch (err) {
+            logger_1.logger.error(`Failed to normalize existing user names: ${err.message}`);
         }
     }
     catch (error) {
@@ -241,6 +326,8 @@ async function startServer() {
             dbName: config_1.config.mongo.dbName,
         });
         logger_1.logger.info('MongoDB connected successfully.');
+        // Backfill missing orgIds on legacy records
+        await backfillOrgIds();
         // Seed config and default user
         await seedDatabase();
         // Migrate empty Task IDs
@@ -288,7 +375,7 @@ async function startServer() {
         });
         server.listen(PORT, () => {
             logger_1.logger.info(`===============================================`);
-            logger_1.logger.info(`Sahayak AI Backend running on port ${PORT}`);
+            logger_1.logger.info(`Setu AI Backend running on port ${PORT}`);
             logger_1.logger.info(`Swagger API Documentation: http://localhost:${PORT}/api-docs`);
             logger_1.logger.info(`===============================================`);
         });

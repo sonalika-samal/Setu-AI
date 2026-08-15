@@ -3,7 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CredentialModel = void 0;
 const mongoose_1 = require("mongoose");
 const CredentialSchema = new mongoose_1.Schema({
-    key: { type: String, required: true, unique: true, default: 'global_config' },
+    orgId: { type: String, required: true, unique: true, default: 'default', index: true },
+    key: { type: String, default: 'global_config' },
     // Meta WhatsApp settings
     metaAccessToken: { type: String, default: '' }, // encrypted
     metaPhoneNumberId: { type: String, default: '' },
@@ -24,6 +25,7 @@ const CredentialSchema = new mongoose_1.Schema({
     reminderOffset2: { type: Number, default: 90 }, // default 1.5 hours
     reminderOffset3: { type: Number, default: 30 }, // default 30 mins
     language: { type: String, default: 'en' },
+    googleClientId: { type: String, default: '' },
     taskAssignmentTemplate: {
         type: String,
         default: 'Hello {{worker_name}},\n\nYou have been assigned a new task.\n\nTask:\n{{task_msg}}\n\nLocation:\n{{location}}\n\nDeadline:\n{{deadline}}\n\nCompany:\n{{company_name}}\n\nPlease reply "got it" after reading the task. Reply "completed" after finishing the work.'

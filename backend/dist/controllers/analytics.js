@@ -7,36 +7,40 @@ const Department_1 = require("../models/Department");
 class AnalyticsController {
     async getSummary(req, res, next) {
         try {
+            const orgId = req.orgId || 'default';
             const now = new Date();
             // 1. Task counts
-            const totalTasks = await Task_1.TaskModel.countDocuments({});
-            const open = await Task_1.TaskModel.countDocuments({ task_status: 'Open' });
-            const started = await Task_1.TaskModel.countDocuments({ task_status: 'Started' });
-            const details = await Task_1.TaskModel.countDocuments({ task_status: 'More Details Asked' });
-            const completed = await Task_1.TaskModel.countDocuments({ task_status: 'Completed' });
-            const closed = await Task_1.TaskModel.countDocuments({ task_status: 'Closed' });
+            const totalTasks = await Task_1.TaskModel.countDocuments({ orgId });
+            const open = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Open' });
+            const started = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Started' });
+            const details = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'More Details Asked' });
+            const completed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Completed' });
+            const closed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Closed' });
             const overdue = await Task_1.TaskModel.countDocuments({
+                orgId,
                 task_status: { $nin: ['Completed', 'Closed'] },
                 deadline: { $lt: now }
             });
             const escalated = await Task_1.TaskModel.countDocuments({
+                orgId,
                 task_status: { $nin: ['Completed', 'Closed'] },
                 is_escalated: true
             });
             // 2. Worker metrics
-            const enabledWorkers = await User_1.UserModel.countDocuments({ role: 'Worker', worker_status: 'Enabled' });
-            const disabledWorkers = await User_1.UserModel.countDocuments({ role: 'Worker', worker_status: 'Disabled' });
-            const availableWorkers = await User_1.UserModel.countDocuments({ role: 'Worker', worker_status: 'Enabled', availability_status: 'Available' });
-            const unavailableWorkers = await User_1.UserModel.countDocuments({ role: 'Worker', worker_status: 'Enabled', availability_status: 'Unavailable' });
+            const enabledWorkers = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', worker_status: 'Enabled' });
+            const disabledWorkers = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', worker_status: 'Disabled' });
+            const availableWorkers = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', worker_status: 'Enabled', availability_status: 'Available' });
+            const unavailableWorkers = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', worker_status: 'Enabled', availability_status: 'Unavailable' });
             // 3. Department Performance
-            const departments = await Department_1.DepartmentModel.find().lean();
+            const departments = await Department_1.DepartmentModel.find({ orgId }).lean();
             const departmentPerformance = [];
             for (const dept of departments) {
-                const workersInDept = await User_1.UserModel.find({ department_id: dept._id }).select('_id').lean();
+                const workersInDept = await User_1.UserModel.find({ orgId, department_id: dept._id }).select('_id').lean();
                 const workerIds = workersInDept.map(w => w._id.toString());
                 // Find tasks assigned to these workers
-                const tasksCount = await Task_1.TaskModel.countDocuments({ worker_id: { $in: workerIds } });
+                const tasksCount = await Task_1.TaskModel.countDocuments({ orgId, worker_id: { $in: workerIds } });
                 const completedTasksCount = await Task_1.TaskModel.countDocuments({
+                    orgId,
                     worker_id: { $in: workerIds },
                     task_status: { $in: ['Completed', 'Closed'] }
                 });
@@ -50,6 +54,7 @@ class AnalyticsController {
             }
             // 4. Average Completion Time (in minutes) for completed tasks
             const completedTasks = await Task_1.TaskModel.find({
+                orgId,
                 task_status: { $in: ['Completed', 'Closed'] },
                 started_time: { $exists: true },
                 completed_time: { $exists: true }
@@ -69,14 +74,16 @@ class AnalyticsController {
                 ? Math.round((totalDurationMs / durationCount) / (1000 * 60))
                 : 0;
             // 5. Worker Productivity
-            const workers = await User_1.UserModel.find({ role: 'Worker' }).lean();
+            const workers = await User_1.UserModel.find({ orgId, role: 'Worker' }).lean();
             const workerProductivity = [];
             for (const w of workers) {
                 const completedCount = await Task_1.TaskModel.countDocuments({
+                    orgId,
                     worker_id: w._id.toString(),
                     task_status: { $in: ['Completed', 'Closed'] }
                 });
                 const activeCount = await Task_1.TaskModel.countDocuments({
+                    orgId,
                     worker_id: w._id.toString(),
                     task_status: { $in: ['Open', 'Started', 'More Details Asked'] }
                 });
@@ -100,9 +107,11 @@ class AnalyticsController {
                 dayEnd.setDate(dayEnd.getDate() - i);
                 dayEnd.setHours(23, 59, 59, 999);
                 const createdCount = await Task_1.TaskModel.countDocuments({
+                    orgId,
                     createdAt: { $gte: dayStart, $lte: dayEnd }
                 });
                 const completedCount = await Task_1.TaskModel.countDocuments({
+                    orgId,
                     task_status: { $in: ['Completed', 'Closed'] },
                     completed_time: { $gte: dayStart, $lte: dayEnd }
                 });
@@ -113,9 +122,11 @@ class AnalyticsController {
             // 7. Reminders and Escalations stats
             const { ActivityLogModel } = require('../models/ActivityLog');
             const remindersSent = await ActivityLogModel.countDocuments({
+                orgId,
                 action: { $regex: /Reminder/i }
             });
             const escalationsCount = await ActivityLogModel.countDocuments({
+                orgId,
                 action: { $regex: /Escalat/i }
             });
             res.status(200).json({
@@ -150,7 +161,8 @@ class AnalyticsController {
     }
     async exportReport(req, res, next) {
         try {
-            const tasks = await Task_1.TaskModel.find().sort({ createdAt: -1 }).lean();
+            const orgId = req.orgId || 'default';
+            const tasks = await Task_1.TaskModel.find({ orgId }).sort({ createdAt: -1 }).lean();
             // Formulate CSV header & content
             const headers = ['Task ID', 'Worker Name', 'Task Message', 'Location', 'Deadline', 'Status', 'Overdue', 'Escalated', 'Created At', 'Completed At'];
             const rows = tasks.map(t => [
@@ -167,7 +179,7 @@ class AnalyticsController {
             ]);
             const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
             res.setHeader('Content-Type', 'text/csv');
-            res.setHeader('Content-Disposition', 'attachment; filename=sahayak_analytics_report.csv');
+            res.setHeader('Content-Disposition', 'attachment; filename=setu_ai_analytics_report.csv');
             res.status(200).send(csvContent);
         }
         catch (error) {

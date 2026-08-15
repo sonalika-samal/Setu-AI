@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebhookLogModel = void 0;
 const mongoose_1 = require("mongoose");
 const WebhookLogSchema = new mongoose_1.Schema({
+    orgId: { type: String, required: true, default: 'default', index: true },
     sender_name: { type: String, default: '' },
     sender_phone: { type: String, default: '' },
     message_id: { type: String, default: '' },

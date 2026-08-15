@@ -8,6 +8,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = __importDefault(require("crypto"));
 const UserService_1 = require("../services/UserService");
 const LoggingService_1 = require("../services/LoggingService");
+const CredentialService_1 = require("../services/CredentialService");
 const config_1 = require("../config/config");
 const User_1 = require("../models/User");
 const RefreshToken_1 = require("../models/RefreshToken");
@@ -15,6 +16,7 @@ const LoginHistory_1 = require("../models/LoginHistory");
 const SecurityLog_1 = require("../models/SecurityLog");
 const userService = new UserService_1.UserService();
 const loggingService = new LoggingService_1.LoggingService();
+const credentialService = new CredentialService_1.CredentialService();
 class AuthController {
     async login(req, res, next) {
         try {
@@ -60,13 +62,15 @@ class AuthController {
                 res.status(403).json({ message: 'Access Denied: This account has been disabled.' });
                 return;
             }
-            // 3. Generate response token (including token_version)
-            const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username, role: user.role, token_version: dbUser?.token_version || 0 }, config_1.config.jwtSecret, { expiresIn: '15m' });
+            const userOrgId = dbUser?.orgId || 'default';
+            // 3. Generate response token (including token_version and orgId)
+            const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username, role: user.role, orgId: userOrgId, token_version: dbUser?.token_version || 0 }, config_1.config.jwtSecret, { expiresIn: '15m' });
             // 4. Generate and save Refresh Token
             const refreshTokenValue = crypto_1.default.randomBytes(40).toString('hex');
             const refreshTokenExpiry = new Date();
             refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7);
             await RefreshToken_1.RefreshTokenModel.create({
+                orgId: userOrgId,
                 user_id: user.id,
                 token: refreshTokenValue,
                 expires_at: refreshTokenExpiry,
@@ -75,6 +79,7 @@ class AuthController {
             });
             // Log successful login
             await LoginHistory_1.LoginHistoryModel.create({
+                orgId: userOrgId,
                 user_id: user.id,
                 username: user.username,
                 ip_address: ip,
@@ -82,6 +87,7 @@ class AuthController {
                 status: 'Success'
             });
             await SecurityLog_1.SecurityLogModel.create({
+                orgId: userOrgId,
                 user_id: user.id,
                 username: user.username,
                 action: 'Login Success',
@@ -89,7 +95,7 @@ class AuthController {
                 details: 'User authenticated successfully.'
             });
             // Log action in activity logs
-            await loggingService.logActivity(user.username, 'Login Success', 'User successfully authenticated via dashboard.');
+            await loggingService.logActivity(user.username, 'Login Success', 'User successfully authenticated via dashboard.', userOrgId);
             // 5. Return Response
             res.status(200).json({
                 token,
@@ -100,6 +106,7 @@ class AuthController {
                     name: user.name,
                     phone: user.phone,
                     role: user.role,
+                    orgId: userOrgId,
                     status: user.status,
                 },
             });
@@ -233,13 +240,13 @@ class AuthController {
     async updateAdminOwner(req, res, next) {
         try {
             const { id } = req.params;
-            const { username, name, phone, password, role } = req.body;
+            const { username, name, phone, password, role, googleEmail } = req.body;
             const user = req.user;
             if (role && !['Admin', 'Owner'].includes(role)) {
                 res.status(400).json({ message: 'Invalid role.' });
                 return;
             }
-            const success = await userService.updateAdminOwner(id, { username, name, phone, password, role }, user?.username || 'system');
+            const success = await userService.updateAdminOwner(id, { username, name, phone, password, role, googleEmail }, user?.username || 'system');
             if (!success) {
                 res.status(404).json({ message: 'Admin/Owner not found' });
                 return;
@@ -287,7 +294,7 @@ class AuthController {
                 res.status(403).json({ message: 'Account is disabled or missing.' });
                 return;
             }
-            const token = jsonwebtoken_1.default.sign({ id: dbUser._id.toString(), username: dbUser.username, role: dbUser.role, token_version: dbUser.token_version }, config_1.config.jwtSecret, { expiresIn: '15m' });
+            const token = jsonwebtoken_1.default.sign({ id: dbUser._id.toString(), username: dbUser.username, role: dbUser.role, orgId: dbUser.orgId || 'default', token_version: dbUser.token_version }, config_1.config.jwtSecret, { expiresIn: '15m' });
             res.status(200).json({ token });
         }
         catch (error) {
@@ -534,6 +541,109 @@ class AuthController {
             const loggingService = new LoggingService_1.LoggingService();
             await loggingService.logActivity(executor?.username || 'system', 'Workers Bulk Updated', `Bulk updated status of ${workerIds.length} workers to ${status}.`);
             res.status(200).json({ message: `Bulk status update successful.` });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    async getGoogleConfig(req, res, next) {
+        try {
+            const credentials = await credentialService.getCredentials('default');
+            res.status(200).json({
+                clientId: credentials.google?.clientId || ''
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    async googleLogin(req, res, next) {
+        try {
+            const { idToken } = req.body;
+            const ip = req.ip || req.socket.remoteAddress || 'unknown';
+            const userAgent = req.headers['user-agent'] || 'unknown';
+            if (!idToken) {
+                res.status(400).json({ message: 'Google ID token is required.' });
+                return;
+            }
+            // Verify token via google tokeninfo endpoint
+            const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+            if (!tokenInfoRes.ok) {
+                res.status(401).json({ message: 'Invalid Google token.' });
+                return;
+            }
+            const tokenInfo = await tokenInfoRes.json();
+            if (tokenInfo.email_verified !== 'true' && tokenInfo.email_verified !== true) {
+                res.status(401).json({ message: 'Google email is not verified.' });
+                return;
+            }
+            const email = tokenInfo.email;
+            if (!email) {
+                res.status(400).json({ message: 'Email address not found in Google token.' });
+                return;
+            }
+            // Find administrative user with matching googleEmail
+            const user = await User_1.UserModel.findOne({
+                googleEmail: email.toLowerCase().trim(),
+                role: { $in: ['Owner', 'Admin'] },
+                orgId: 'default'
+            });
+            if (!user) {
+                res.status(403).json({ message: `Google account ${email} is not authorized for administrative login. Please link this email to your account under Credentials.` });
+                return;
+            }
+            if (user.account_status === 'Disabled') {
+                res.status(403).json({ message: 'Access Denied: This account has been disabled.' });
+                return;
+            }
+            // Generate JWT (including token_version and orgId)
+            const userOrgId = user.orgId || 'default';
+            const token = jsonwebtoken_1.default.sign({ id: user._id.toString(), username: user.username, role: user.role, orgId: userOrgId, token_version: user.token_version || 0 }, config_1.config.jwtSecret, { expiresIn: '15m' });
+            // Generate and save Refresh Token
+            const refreshTokenValue = crypto_1.default.randomBytes(40).toString('hex');
+            const refreshTokenExpiry = new Date();
+            refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7);
+            await RefreshToken_1.RefreshTokenModel.create({
+                orgId: userOrgId,
+                user_id: user._id.toString(),
+                token: refreshTokenValue,
+                expires_at: refreshTokenExpiry,
+                ip_address: ip,
+                user_agent: userAgent
+            });
+            // Log successful login
+            await LoginHistory_1.LoginHistoryModel.create({
+                orgId: userOrgId,
+                user_id: user._id.toString(),
+                username: user.username,
+                ip_address: ip,
+                user_agent: userAgent,
+                status: 'Success'
+            });
+            await SecurityLog_1.SecurityLogModel.create({
+                orgId: userOrgId,
+                user_id: user._id.toString(),
+                username: user.username,
+                action: 'Google Login Success',
+                ip_address: ip,
+                details: `User authenticated via Google (${email}) successfully.`
+            });
+            // Log action in activity logs
+            await loggingService.logActivity(user.username, 'Login Success', 'User successfully authenticated via Google Sign-In.', userOrgId);
+            // Return Response
+            res.status(200).json({
+                token,
+                refreshToken: refreshTokenValue,
+                user: {
+                    id: user._id.toString(),
+                    username: user.username,
+                    name: user.name,
+                    phone: user.phone,
+                    role: user.role,
+                    orgId: userOrgId,
+                    status: user.status,
+                },
+            });
         }
         catch (error) {
             next(error);

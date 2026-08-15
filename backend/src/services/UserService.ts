@@ -213,6 +213,9 @@ export class UserService {
     if (data.name) user.name = data.name;
     if (data.role) user.role = data.role;
     if (data.password) user.password = data.password;
+    if (data.googleEmail !== undefined) {
+      user.googleEmail = data.googleEmail.trim().toLowerCase();
+    }
 
     await user.save();
 

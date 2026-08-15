@@ -35,11 +35,14 @@ const authenticateJWT = async (req, res, next) => {
             res.status(401).json({ message: 'Session expired or invalidated. Please sign in again.' });
             return;
         }
+        const resolvedOrgId = userExists.orgId || decoded.orgId || 'default';
         req.user = {
             id: decoded.id,
             username: decoded.username,
             role: decoded.role,
+            orgId: resolvedOrgId,
         };
+        req.orgId = resolvedOrgId;
         next();
     }
     catch (error) {

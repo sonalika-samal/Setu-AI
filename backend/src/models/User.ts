@@ -17,6 +17,7 @@ const UserSchema = new Schema(
     worker_status: { type: String, enum: ['Enabled', 'Disabled'], default: 'Enabled' },
     account_status: { type: String, enum: ['Enabled', 'Disabled'], default: 'Enabled' },
     token_version: { type: Number, default: 0 },
+    googleEmail: { type: String, default: '', index: true },
 
     // Attendance & Availability
     availability_status: { type: String, enum: ['Available', 'Unavailable'], default: 'Unavailable' },

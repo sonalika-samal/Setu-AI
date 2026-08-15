@@ -93,40 +93,73 @@ async function seedDatabase() {
       logger.info('Seeding default credentials into MongoDB...');
       const defaultCreds = await credentialRepo.getCredentials('default');
       await credentialRepo.updateCredentials(defaultCreds, 'default');
+    } else {
+      // Ensure default googleClientId in database matches config from environment
+      const globalCreds = await CredentialModel.findOne({ orgId: 'default' }) || await CredentialModel.findOne({ key: 'global_config' });
+      if (globalCreds && (!globalCreds.googleClientId || globalCreds.googleClientId !== config.google?.clientId)) {
+        logger.info('Updating googleClientId in database to match environment configuration...');
+        globalCreds.googleClientId = config.google?.clientId || '1234567890-placeholder.apps.googleusercontent.com';
+        await globalCreds.save();
+      }
     }
 
     // 2. Seed default Administrator User (Username-based)
     const adminUsername = config.defaultAdmin.username || 'admin';
-    const adminExists = await UserModel.findOne({ username: adminUsername, orgId: 'default' });
-    if (!adminExists) {
+    let adminUser = await UserModel.findOne({ username: adminUsername, orgId: 'default' });
+    const newAdminPassword = config.defaultAdmin.password || 'AdminSecure2026#SetuAI_!$';
+    if (!adminUser) {
       logger.info(`Seeding default administrator user: ${adminUsername}`);
       await UserModel.create({
         orgId: 'default',
         username: adminUsername,
-        password: config.defaultAdmin.password || 'AdminPassword123!',
+        password: newAdminPassword,
         name: 'Setu AI Admin',
         phone: '+919999999999',
         role: 'Admin',
         status: 'Active',
       });
       logger.info('Administrator user seeded successfully.');
+    } else {
+      // Check if they have the old weak default password and upgrade them
+      const isWeak = await (adminUser as any).comparePassword('AdminPassword123!');
+      const isOldSecure = await (adminUser as any).comparePassword('AdminSecure2026');
+      if (isWeak || isOldSecure) {
+        logger.info(`Upgrading weak default password for administrator user: ${adminUsername}`);
+        adminUser.password = newAdminPassword;
+        await adminUser.save();
+      }
     }
 
     // 3. Seed default Owner User (Username-based)
     const ownerUsername = 'owner';
-    const ownerExists = await UserModel.findOne({ username: ownerUsername, orgId: 'default' });
-    if (!ownerExists) {
+    let ownerUser = await UserModel.findOne({ username: ownerUsername, orgId: 'default' });
+    const newOwnerPassword = 'OwnerSecure2026#SetuAI_!$';
+    if (!ownerUser) {
       logger.info(`Seeding default owner user: ${ownerUsername}`);
       await UserModel.create({
         orgId: 'default',
         username: ownerUsername,
-        password: 'OwnerPassword123!',
+        password: newOwnerPassword,
         name: 'Setu AI Owner',
         phone: '+918888888888',
         role: 'Owner',
         status: 'Active',
       });
       logger.info('Owner user seeded successfully.');
+    } else {
+      // Check if they have the old weak default password and upgrade them
+      const isWeak = await (ownerUser as any).comparePassword('OwnerPassword123!');
+      if (isWeak) {
+        logger.info(`Upgrading weak default password for owner user: ${ownerUsername}`);
+        ownerUser.password = newOwnerPassword;
+        await ownerUser.save();
+      }
+    }
+
+    // Ensure there is only one Owner login in the system
+    const deleteOwnersResult = await UserModel.deleteMany({ role: 'Owner', username: { $ne: ownerUsername } });
+    if (deleteOwnersResult.deletedCount > 0) {
+      logger.info(`Cleaned up ${deleteOwnersResult.deletedCount} extra owner login(s) to enforce a single owner system.`);
     }
 
     // 4. Update any existing users with name containing "Sahayak" to "Setu AI"

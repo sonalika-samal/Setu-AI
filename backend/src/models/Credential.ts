@@ -27,6 +27,7 @@ const CredentialSchema = new Schema(
     reminderOffset2: { type: Number, default: 90 },  // default 1.5 hours
     reminderOffset3: { type: Number, default: 30 },  // default 30 mins
     language: { type: String, default: 'en' },
+    googleClientId: { type: String, default: '' },
     taskAssignmentTemplate: {
       type: String,
       default: 'Hello {{worker_name}},\n\nYou have been assigned a new task.\n\nTask:\n{{task_msg}}\n\nLocation:\n{{location}}\n\nDeadline:\n{{deadline}}\n\nCompany:\n{{company_name}}\n\nPlease reply "got it" after reading the task. Reply "completed" after finishing the work.'

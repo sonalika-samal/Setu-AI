@@ -52,6 +52,17 @@ router.post(
   authController.login.bind(authController)
 );
 
+router.get(
+  '/google-config',
+  authController.getGoogleConfig.bind(authController)
+);
+
+router.post(
+  '/google-login',
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+  authController.googleLogin.bind(authController)
+);
+
 /**
  * @swagger
  * /api/auth/signup:

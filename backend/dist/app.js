@@ -13,7 +13,10 @@ const routes_1 = __importDefault(require("./routes"));
 const error_1 = require("./middlewares/error");
 const app = (0, express_1.default)();
 // Middlewares
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: process.env.FRONTEND_URL || '*',
+    credentials: true
+}));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 const uploadsDir = path_1.default.join(process.cwd(), 'uploads');
@@ -26,14 +29,14 @@ const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'Sahayak AI API Documentation',
+            title: 'Setu AI API Documentation',
             version: '1.0.0',
-            description: 'Sahayak AI Phase 1 API details for auth, credentials, task stats and webhook telemetry.',
+            description: 'Setu AI Multi-Tenant Production SaaS API details.',
         },
         servers: [
             {
-                url: 'http://localhost:5000',
-                description: 'Development Server',
+                url: process.env.API_URL || 'http://localhost:5000',
+                description: 'Setu AI Backend Server',
             },
         ],
         components: {

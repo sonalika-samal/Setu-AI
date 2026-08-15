@@ -9,17 +9,17 @@ class WhatsAppService {
     messageLogRepo = new MessageLogRepository_1.MessageLogRepository();
     /**
      * Helper to make requests to the Meta Graph API.
-     * Credentials are loaded dynamically so any updates are picked up instantly.
+     * Credentials are loaded dynamically per org.
      */
-    async makeMetaRequest(endpoint, options) {
-        const creds = await this.credentialRepo.getCredentials();
+    async makeMetaRequest(endpoint, options, orgId = 'default') {
+        const creds = await this.credentialRepo.getCredentials(orgId);
         const token = creds.meta.accessToken;
         const phoneId = creds.meta.phoneNumberId;
         if (!token || !phoneId) {
-            throw new Error('Meta WhatsApp credentials are not configured.');
+            throw new Error(`Meta WhatsApp credentials are not configured for organisation: ${orgId}`);
         }
         if (token.toLowerCase().includes('mock') || phoneId.toLowerCase().includes('mock')) {
-            logger_1.logger.info(`[WhatsAppService]: Mock WABA Request to endpoint: ${endpoint}`);
+            logger_1.logger.info(`[WhatsAppService][${orgId}]: Mock WABA Request to endpoint: ${endpoint}`);
             return {
                 messages: [{ id: `wamid.mock_${Math.random().toString(36).substring(2, 15)}` }]
             };
@@ -33,7 +33,7 @@ class WhatsAppService {
         const res = await fetch(url, { ...options, headers });
         if (!res.ok) {
             const errorText = await res.text();
-            logger_1.logger.error(`Meta WhatsApp API call failed: ${errorText}`);
+            logger_1.logger.error(`Meta WhatsApp API call failed for org ${orgId}: ${errorText}`);
             throw new Error(`Meta WhatsApp API error: ${errorText}`);
         }
         return res.json();
@@ -41,8 +41,8 @@ class WhatsAppService {
     /**
      * Send a standard text message
      */
-    async sendMessage(to, content) {
-        logger_1.logger.info(`WhatsApp Service: Sending text message to ${to}`);
+    async sendMessage(to, content, orgId = 'default') {
+        logger_1.logger.info(`WhatsApp Service [${orgId}]: Sending text message to ${to}`);
         try {
             const response = await this.makeMetaRequest('messages', {
                 method: 'POST',
@@ -53,10 +53,11 @@ class WhatsAppService {
                     type: 'text',
                     text: { body: content }
                 })
-            });
+            }, orgId);
             const messageId = response.messages?.[0]?.id || `out_${Date.now()}`;
             // Log outgoing message to database
             await this.messageLogRepo.create({
+                orgId,
                 message_id: messageId,
                 sender: 'system',
                 receiver: to,
@@ -69,15 +70,15 @@ class WhatsAppService {
             return response;
         }
         catch (err) {
-            logger_1.logger.error(`Failed to send WhatsApp message: ${err.message}`);
+            logger_1.logger.error(`Failed to send WhatsApp message for org ${orgId}: ${err.message}`);
             throw err;
         }
     }
     /**
      * Send a template message
      */
-    async sendTemplate(to, templateName, languageCode = 'en', components = []) {
-        logger_1.logger.info(`WhatsApp Service: Sending template ${templateName} to ${to}`);
+    async sendTemplate(to, templateName, languageCode = 'en', components = [], orgId = 'default') {
+        logger_1.logger.info(`WhatsApp Service [${orgId}]: Sending template ${templateName} to ${to}`);
         try {
             const response = await this.makeMetaRequest('messages', {
                 method: 'POST',
@@ -92,9 +93,10 @@ class WhatsAppService {
                         components
                     }
                 })
-            });
+            }, orgId);
             const messageId = response.messages?.[0]?.id || `out_${Date.now()}`;
             await this.messageLogRepo.create({
+                orgId,
                 message_id: messageId,
                 sender: 'system',
                 receiver: to,
@@ -107,15 +109,15 @@ class WhatsAppService {
             return response;
         }
         catch (err) {
-            logger_1.logger.error(`Failed to send WhatsApp template: ${err.message}`);
+            logger_1.logger.error(`Failed to send WhatsApp template for org ${orgId}: ${err.message}`);
             throw err;
         }
     }
     /**
      * Send an image message
      */
-    async sendImage(to, imageUrl, caption) {
-        logger_1.logger.info(`WhatsApp Service: Sending image ${imageUrl} to ${to}`);
+    async sendImage(to, imageUrl, caption, orgId = 'default') {
+        logger_1.logger.info(`WhatsApp Service [${orgId}]: Sending image ${imageUrl} to ${to}`);
         try {
             const response = await this.makeMetaRequest('messages', {
                 method: 'POST',
@@ -129,9 +131,10 @@ class WhatsAppService {
                         caption: caption || ''
                     }
                 })
-            });
+            }, orgId);
             const messageId = response.messages?.[0]?.id || `out_${Date.now()}`;
             await this.messageLogRepo.create({
+                orgId,
                 message_id: messageId,
                 sender: 'system',
                 receiver: to,
@@ -144,15 +147,15 @@ class WhatsAppService {
             return response;
         }
         catch (err) {
-            logger_1.logger.error(`Failed to send WhatsApp image: ${err.message}`);
+            logger_1.logger.error(`Failed to send WhatsApp image for org ${orgId}: ${err.message}`);
             throw err;
         }
     }
     /**
      * Send a document message
      */
-    async sendDocument(to, documentUrl, filename, caption) {
-        logger_1.logger.info(`WhatsApp Service: Sending document ${filename} to ${to}`);
+    async sendDocument(to, documentUrl, filename, caption, orgId = 'default') {
+        logger_1.logger.info(`WhatsApp Service [${orgId}]: Sending document ${filename} to ${to}`);
         try {
             const response = await this.makeMetaRequest('messages', {
                 method: 'POST',
@@ -167,9 +170,10 @@ class WhatsAppService {
                         caption: caption || ''
                     }
                 })
-            });
+            }, orgId);
             const messageId = response.messages?.[0]?.id || `out_${Date.now()}`;
             await this.messageLogRepo.create({
+                orgId,
                 message_id: messageId,
                 sender: 'system',
                 receiver: to,
@@ -182,20 +186,20 @@ class WhatsAppService {
             return response;
         }
         catch (err) {
-            logger_1.logger.error(`Failed to send WhatsApp document: ${err.message}`);
+            logger_1.logger.error(`Failed to send WhatsApp document for org ${orgId}: ${err.message}`);
             throw err;
         }
     }
     /**
      * Download a media file using Media ID from Meta Graph API
      */
-    async downloadMedia(mediaId) {
-        logger_1.logger.info(`WhatsApp Service: Downloading media ID: ${mediaId}`);
+    async downloadMedia(mediaId, orgId = 'default') {
+        logger_1.logger.info(`WhatsApp Service [${orgId}]: Downloading media ID: ${mediaId}`);
         try {
-            const creds = await this.credentialRepo.getCredentials();
+            const creds = await this.credentialRepo.getCredentials(orgId);
             const token = creds.meta.accessToken;
             if (!token) {
-                throw new Error('Meta WhatsApp Access Token not configured.');
+                throw new Error(`Meta WhatsApp Access Token not configured for org: ${orgId}`);
             }
             if (token.toLowerCase().includes('mock') || mediaId.toLowerCase().includes('mock')) {
                 logger_1.logger.info(`[WhatsAppService]: Mock media download for ID: ${mediaId}`);

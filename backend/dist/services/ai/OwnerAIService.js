@@ -11,11 +11,11 @@ const aiService = new AIService_1.AIService();
 const credentialRepo = new CredentialRepository_1.CredentialRepository();
 const loggingService = new LoggingService_1.LoggingService();
 class OwnerAIService {
-    async chat(message, historyContext, username) {
-        logger_1.logger.info(`OwnerAIService: Processing chat request for user: ${username}`);
+    async chat(message, historyContext, username, orgId = 'default') {
+        logger_1.logger.info(`OwnerAIService: Processing chat request for user: ${username} in org: ${orgId}`);
         try {
             // 1. Get credentials and determine AI model settings
-            const creds = await credentialRepo.getCredentials();
+            const creds = await credentialRepo.getCredentials(orgId);
             const aiProvider = 'sarvam';
             const aiModel = creds.sarvam.taskExtractionModel || 'sarvam-105b';
             let classificationModel = creds.sarvam.classificationModel || 'sarvam-105b';
@@ -38,8 +38,8 @@ class OwnerAIService {
                     .join('\n');
             }
             // 3. Step 1: Predefined operation classification and parameter extraction
-            await loggingService.logActivity(username, 'AI Started', 'Classifying Owner assistant query operation.');
-            const queryClassifierPrompt = `You are a query classifier and parameter extractor for Sahayak AI Owner Assistant.
+            await loggingService.logActivity(username, 'AI Started', 'Classifying Owner assistant query operation.', orgId);
+            const queryClassifierPrompt = `You are a query classifier and parameter extractor for Setu AI Owner Assistant.
 An Owner has sent this query: "${message}"
 Recent conversation history:
 ${formattedHistory}
@@ -91,10 +91,10 @@ Do not include any other text or markdown formatting.`;
                     }
                 };
                 classificationObj = cleanAndParseJSON(classificationText);
-                await loggingService.logActivity(username, 'AI Completed', `Query classified as operation: ${classificationObj?.operation}`);
+                await loggingService.logActivity(username, 'AI Completed', `Query classified as operation: ${classificationObj?.operation}`, orgId);
             }
             catch (classErr) {
-                await loggingService.logActivity(username, 'AI Failure', `Query classification failed: ${classErr.message}.`);
+                await loggingService.logActivity(username, 'AI Failure', `Query classification failed: ${classErr.message}.`, orgId);
             }
             const operation = classificationObj?.operation || 'UNKNOWN';
             const parameters = classificationObj?.parameters || {};
@@ -102,10 +102,10 @@ Do not include any other text or markdown formatting.`;
             let queryResults = null;
             if (operation !== 'UNKNOWN') {
                 try {
-                    queryResults = await queryService.executeQuery(operation, parameters);
+                    queryResults = await queryService.executeQuery(operation, parameters, orgId);
                 }
                 catch (dbErr) {
-                    await loggingService.logActivity(username, 'MongoDB Failure', `Query execution failed: ${dbErr.message}`);
+                    await loggingService.logActivity(username, 'MongoDB Failure', `Query execution failed: ${dbErr.message}`, orgId);
                     queryResults = { error: dbErr.message };
                 }
             }
@@ -114,7 +114,7 @@ Do not include any other text or markdown formatting.`;
             }
             // 5. Step 3: Natural language response formatting
             await loggingService.logActivity(username, 'AI Started', 'Formatting query results into natural language response.');
-            const formattingPrompt = `You are Sahayak Owner AI Assistant.
+            const formattingPrompt = `You are Setu AI Owner Assistant.
 The owner asked: "${message}"
 Here are the factual records retrieved from the database:
 ${JSON.stringify(queryResults)}

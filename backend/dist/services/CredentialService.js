@@ -9,12 +9,12 @@ const CredentialRepository_1 = require("../repositories/CredentialRepository");
 const logger_1 = require("../utils/logger");
 class CredentialService {
     credentialRepo = new CredentialRepository_1.CredentialRepository();
-    async getCredentials() {
-        return this.credentialRepo.getCredentials();
+    async getCredentials(orgId = 'default') {
+        return this.credentialRepo.getCredentials(orgId);
     }
-    async updateCredentials(data) {
-        logger_1.logger.info('Updating application credentials.');
-        return this.credentialRepo.updateCredentials(data);
+    async updateCredentials(data, orgId = 'default') {
+        logger_1.logger.info(`Updating application credentials for org: ${orgId}.`);
+        return this.credentialRepo.updateCredentials(data, orgId);
     }
     async getDatabaseStatus() {
         const states = ['Disconnected', 'Connected', 'Connecting', 'Disconnecting'];

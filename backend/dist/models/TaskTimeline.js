@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TaskTimelineModel = void 0;
 const mongoose_1 = require("mongoose");
 const TaskTimelineSchema = new mongoose_1.Schema({
+    orgId: { type: String, required: true, default: 'default', index: true },
     task_id: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Task', required: true, index: true },
     action: { type: String, required: true }, // e.g., 'Task Created', 'Task Assigned', 'Worker Accepted', 'Reminder Sent', 'Task Completed'
     description: { type: String, default: '' },

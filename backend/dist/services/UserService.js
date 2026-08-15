@@ -184,6 +184,9 @@ class UserService {
             user.role = data.role;
         if (data.password)
             user.password = data.password;
+        if (data.googleEmail !== undefined) {
+            user.googleEmail = data.googleEmail.trim().toLowerCase();
+        }
         await user.save();
         const { LoggingService } = require('./LoggingService');
         const loggingService = new LoggingService();

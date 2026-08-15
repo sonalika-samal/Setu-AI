@@ -10,7 +10,8 @@ const loggingService = new LoggingService_1.LoggingService();
 class DepartmentController {
     async list(req, res, next) {
         try {
-            const depts = await Department_1.DepartmentModel.find().sort({ name: 1 });
+            const orgId = req.orgId || 'default';
+            const depts = await Department_1.DepartmentModel.find({ orgId }).sort({ name: 1 });
             res.status(200).json(depts);
         }
         catch (error) {
@@ -21,17 +22,19 @@ class DepartmentController {
         try {
             const { name, code, description } = req.body;
             const user = req.user;
+            const orgId = req.orgId || 'default';
             if (!name || !code) {
                 res.status(400).json({ message: 'Name and Code are required.' });
                 return;
             }
-            const existingName = await Department_1.DepartmentModel.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-            const existingCode = await Department_1.DepartmentModel.findOne({ code: { $regex: new RegExp(`^${code}$`, 'i') } });
+            const existingName = await Department_1.DepartmentModel.findOne({ orgId, name: { $regex: new RegExp(`^${name}$`, 'i') } });
+            const existingCode = await Department_1.DepartmentModel.findOne({ orgId, code: { $regex: new RegExp(`^${code}$`, 'i') } });
             if (existingName || existingCode) {
-                res.status(400).json({ message: 'Department with this name or code already exists.' });
+                res.status(400).json({ message: 'Department with this name or code already exists in your organisation.' });
                 return;
             }
             const dept = await Department_1.DepartmentModel.create({
+                orgId,
                 name,
                 code: code.toUpperCase(),
                 description,
@@ -45,6 +48,7 @@ class DepartmentController {
             // Bell notification
             const { NotificationModel } = require('../models/Notification');
             const notification = await NotificationModel.create({
+                orgId,
                 title: 'Department Created',
                 description: `Department "${name}" (${code.toUpperCase()}) was created by "${user?.username || 'system'}".`,
                 type: 'Department Alert',

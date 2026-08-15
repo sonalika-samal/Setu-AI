@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { UserService } from '../services/UserService';
 import { LoggingService } from '../services/LoggingService';
+import { CredentialService } from '../services/CredentialService';
 import { config } from '../config/config';
 import { AuthRequest } from '../middlewares/auth';
 import { UserModel } from '../models/User';
@@ -12,6 +13,7 @@ import { SecurityLogModel } from '../models/SecurityLog';
 
 const userService = new UserService();
 const loggingService = new LoggingService();
+const credentialService = new CredentialService();
 
 export class AuthController {
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -262,7 +264,7 @@ export class AuthController {
   async updateAdminOwner(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { username, name, phone, password, role } = req.body;
+      const { username, name, phone, password, role, googleEmail } = req.body;
       const user = (req as AuthRequest).user;
 
       if (role && !['Admin', 'Owner'].includes(role)) {
@@ -270,7 +272,7 @@ export class AuthController {
         return;
       }
 
-      const success = await userService.updateAdminOwner(id, { username, name, phone, password, role }, user?.username || 'system');
+      const success = await userService.updateAdminOwner(id, { username, name, phone, password, role, googleEmail }, user?.username || 'system');
       if (!success) {
         res.status(404).json({ message: 'Admin/Owner not found' });
         return;
@@ -618,6 +620,126 @@ export class AuthController {
       );
 
       res.status(200).json({ message: `Bulk status update successful.` });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getGoogleConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const credentials = await credentialService.getCredentials('default');
+      res.status(200).json({
+        clientId: credentials.google?.clientId || ''
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async googleLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { idToken } = req.body;
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+
+      if (!idToken) {
+        res.status(400).json({ message: 'Google ID token is required.' });
+        return;
+      }
+
+      // Verify token via google tokeninfo endpoint
+      const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      if (!tokenInfoRes.ok) {
+        res.status(401).json({ message: 'Invalid Google token.' });
+        return;
+      }
+
+      const tokenInfo = await tokenInfoRes.json() as any;
+      if (tokenInfo.email_verified !== 'true' && tokenInfo.email_verified !== true) {
+        res.status(401).json({ message: 'Google email is not verified.' });
+        return;
+      }
+
+      const email = tokenInfo.email;
+      if (!email) {
+        res.status(400).json({ message: 'Email address not found in Google token.' });
+        return;
+      }
+
+      // Find administrative user with matching googleEmail
+      const user = await UserModel.findOne({
+        googleEmail: email.toLowerCase().trim(),
+        role: { $in: ['Owner', 'Admin'] },
+        orgId: 'default'
+      });
+
+      if (!user) {
+        res.status(403).json({ message: `Google account ${email} is not authorized for administrative login. Please link this email to your account under Credentials.` });
+        return;
+      }
+
+      if (user.account_status === 'Disabled') {
+        res.status(403).json({ message: 'Access Denied: This account has been disabled.' });
+        return;
+      }
+
+      // Generate JWT (including token_version and orgId)
+      const userOrgId = user.orgId || 'default';
+      const token = jwt.sign(
+        { id: user._id.toString(), username: user.username, role: user.role, orgId: userOrgId, token_version: user.token_version || 0 },
+        config.jwtSecret as jwt.Secret,
+        { expiresIn: '15m' }
+      );
+
+      // Generate and save Refresh Token
+      const refreshTokenValue = crypto.randomBytes(40).toString('hex');
+      const refreshTokenExpiry = new Date();
+      refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7);
+
+      await RefreshTokenModel.create({
+        orgId: userOrgId,
+        user_id: user._id.toString(),
+        token: refreshTokenValue,
+        expires_at: refreshTokenExpiry,
+        ip_address: ip,
+        user_agent: userAgent
+      });
+
+      // Log successful login
+      await LoginHistoryModel.create({
+        orgId: userOrgId,
+        user_id: user._id.toString(),
+        username: user.username,
+        ip_address: ip,
+        user_agent: userAgent,
+        status: 'Success'
+      });
+      await SecurityLogModel.create({
+        orgId: userOrgId,
+        user_id: user._id.toString(),
+        username: user.username,
+        action: 'Google Login Success',
+        ip_address: ip,
+        details: `User authenticated via Google (${email}) successfully.`
+      });
+
+      // Log action in activity logs
+      await loggingService.logActivity(user.username, 'Login Success', 'User successfully authenticated via Google Sign-In.', userOrgId);
+
+      // Return Response
+      res.status(200).json({
+        token,
+        refreshToken: refreshTokenValue,
+        user: {
+          id: user._id.toString(),
+          username: user.username,
+          name: user.name,
+          phone: user.phone,
+          role: user.role,
+          orgId: userOrgId,
+          status: user.status,
+        },
+      });
     } catch (error) {
       next(error);
     }

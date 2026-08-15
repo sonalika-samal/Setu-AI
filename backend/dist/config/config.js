@@ -16,7 +16,7 @@ exports.config = {
     encryptionKey: process.env.ENCRYPTION_KEY || 'sahayak_aes_key_32_chars_secret_!!',
     defaultAdmin: {
         username: process.env.DEFAULT_ADMIN_USERNAME || 'admin',
-        password: process.env.DEFAULT_ADMIN_PASSWORD || 'AdminPassword123!',
+        password: process.env.DEFAULT_ADMIN_PASSWORD || 'AdminSecure2026#SetuAI_!$',
     },
     mongo: {
         uri: process.env.MONGO_URI || 'mongodb+srv://sonalikactc29_db_user:by7BWqHiWnDDVDPX@cluster0.dqu8svm.mongodb.net/?appName=Cluster0',
@@ -36,5 +36,8 @@ exports.config = {
         speechModel: process.env.SARVAM_SPEECH_MODEL || 'saaras:v3',
         taskExtractionModel: process.env.SARVAM_TASK_EXTRACTION_MODEL || 'sarvam-105b',
         classificationModel: process.env.SARVAM_CLASSIFICATION_MODEL || 'sarvam-30b',
+    },
+    google: {
+        clientId: process.env.GOOGLE_CLIENT_ID || '1234567890-placeholder.apps.googleusercontent.com',
     }
 };

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TaskModel = void 0;
 const mongoose_1 = require("mongoose");
 const TaskSchema = new mongoose_1.Schema({
+    orgId: { type: String, required: true, default: 'default', index: true },
     worker_name: { type: String, default: '' },
     task_msg: { type: String, required: true },
     location: { type: String, default: '' },
@@ -20,7 +21,7 @@ const TaskSchema = new mongoose_1.Schema({
     reminder_time: { type: Date },
     reminder_sent: { type: Boolean, default: false },
     message_id: { type: String, default: '' },
-    taskId: { type: String, unique: true, sparse: true, index: true },
+    taskId: { type: String, sparse: true, index: true },
     is_overdue: { type: Boolean, default: false },
     is_escalated: { type: Boolean, default: false },
     // Phase 3 tracking fields
@@ -69,6 +70,8 @@ const TaskSchema = new mongoose_1.Schema({
     ]
 }, { timestamps: true });
 // Indexes
+TaskSchema.index({ taskId: 1, orgId: 1 }, { unique: true, sparse: true });
+TaskSchema.index({ orgId: 1, task_status: 1 });
 TaskSchema.index({ worker_id: 1, task_status: 1 });
 TaskSchema.index({ task_status: 1, deadline: 1 });
 TaskSchema.index({ task_status: 1, createdAt: -1 });

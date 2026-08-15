@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationModel = void 0;
 const mongoose_1 = require("mongoose");
 const NotificationSchema = new mongoose_1.Schema({
+    orgId: { type: String, required: true, default: 'default', index: true },
     title: { type: String, required: true },
     description: { type: String, required: true },
     type: { type: String, required: true }, // e.g. Task Assigned, Task Completed, Task Started, Proof Uploaded, Reminder Sent, Reminder Failed, Task Escalated

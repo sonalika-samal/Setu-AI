@@ -4,26 +4,35 @@ exports.TaskRepository = void 0;
 const Task_1 = require("../models/Task");
 class TaskRepository {
     async create(taskData) {
-        const doc = new Task_1.TaskModel(taskData);
+        const doc = new Task_1.TaskModel({ orgId: taskData.orgId || 'default', ...taskData });
         return doc.save();
     }
-    async findById(id) {
-        return Task_1.TaskModel.findById(id);
+    async findById(id, orgId) {
+        const query = { _id: id };
+        if (orgId)
+            query.orgId = orgId;
+        return Task_1.TaskModel.findOne(query);
     }
-    async findAll() {
-        return Task_1.TaskModel.find().sort({ timestamp: -1 });
+    async findAll(orgId = 'default') {
+        return Task_1.TaskModel.find({ orgId }).sort({ timestamp: -1 });
     }
-    async countByStatus(task_status) {
-        return Task_1.TaskModel.countDocuments({ task_status });
+    async countByStatus(task_status, orgId = 'default') {
+        return Task_1.TaskModel.countDocuments({ orgId, task_status });
     }
-    async countTotal() {
-        return Task_1.TaskModel.countDocuments({});
+    async countTotal(orgId = 'default') {
+        return Task_1.TaskModel.countDocuments({ orgId });
     }
-    async updateStatus(id, task_status) {
-        return Task_1.TaskModel.findByIdAndUpdate(id, { $set: { task_status } }, { new: true });
+    async updateStatus(id, task_status, orgId) {
+        const query = { _id: id };
+        if (orgId)
+            query.orgId = orgId;
+        return Task_1.TaskModel.findOneAndUpdate(query, { $set: { task_status } }, { new: true });
     }
-    async delete(id) {
-        return Task_1.TaskModel.findByIdAndDelete(id);
+    async delete(id, orgId) {
+        const query = { _id: id };
+        if (orgId)
+            query.orgId = orgId;
+        return Task_1.TaskModel.findOneAndDelete(query);
     }
 }
 exports.TaskRepository = TaskRepository;

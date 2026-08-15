@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sparkles, Lock, User, AlertCircle, Eye, EyeOff } from 'lucide-react';
@@ -13,13 +13,83 @@ export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const handleGoogleLogin = async (response: any) => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiBase = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+
+      const res = await fetch(`${apiBase}/auth/google-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: response.credential }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Google authentication failed');
+      }
+
+      login(data.token, data.user);
+      navigate('/');
+    } catch (err) {
+      setError((err as Error).message || 'Failed to authenticate via Google.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const initGoogleSignIn = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiBase = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+
+        const res = await fetch(`${apiBase}/auth/google-config`);
+        const configData = await res.json();
+        if (configData.clientId) {
+          const script = document.createElement('script');
+          script.src = 'https://accounts.google.com/gsi/client';
+          script.async = true;
+          script.defer = true;
+          script.onload = () => {
+            if ((window as any).google) {
+              (window as any).google.accounts.id.initialize({
+                client_id: configData.clientId,
+                callback: handleGoogleLogin,
+              });
+              (window as any).google.accounts.id.renderButton(
+                document.getElementById('google-signin-btn'),
+                { 
+                  theme: 'outline', 
+                  size: 'large', 
+                  width: '380', 
+                  shape: 'rectangular', 
+                  logo_alignment: 'center' 
+                }
+              );
+            }
+          };
+          document.body.appendChild(script);
+        }
+      } catch (err) {
+        console.error('Failed to configure Google Sign-In:', err);
+      }
+    };
+
+    initGoogleSignIn();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiBase = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+      const response = await fetch(`${apiBase}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -63,8 +133,8 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md bg-white/90 p-8 md:p-10 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] relative z-10 border border-white/20 backdrop-blur-xl">
         {/* Title / Logo Header */}
         <div className="flex flex-col items-center mb-8 select-none">
-          <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center transition-transform hover:scale-105 duration-300 mb-1">
-            <img src="/logo-transparent-2.png" alt="Setu AI Logo" className="w-[170%] h-[170%] max-w-none object-cover" />
+          <div className="w-16 h-16 flex items-center justify-center transition-transform hover:scale-105 duration-300 mb-1">
+            <img src="/logo-transparent-2.png" alt="Setu AI Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-2xl font-black tracking-widest mt-2 leading-none uppercase bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">SETU AI</h1>
           <p className="text-[10px] text-indigo-650 font-extrabold uppercase tracking-widest mt-1.5 leading-none">by DotnLott</p>
@@ -90,7 +160,8 @@ export const Login: React.FC = () => {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
+                placeholder="Please type ID..."
+                autoComplete="off"
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-400 font-medium"
                 required
               />
@@ -108,7 +179,8 @@ export const Login: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Please type Password..."
+                autoComplete="new-password"
                 className="w-full pl-10 pr-10 py-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-400 font-medium"
                 required
               />
@@ -136,15 +208,16 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center select-text">
-          <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2">
-            Demo credentials
-          </p>
-          <div className="py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] inline-flex items-center gap-1.5 font-bold text-slate-600">
-            <span>User:</span> <span className="text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-mono font-medium">admin</span>
-            <span className="text-slate-300">|</span>
-            <span>Pass:</span> <span className="text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-mono font-medium">AdminPassword123!</span>
-          </div>
+        {/* Divider */}
+        <div className="flex items-center my-6 text-slate-200">
+          <div className="flex-grow border-t border-slate-200"></div>
+          <span className="flex-shrink mx-4 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Or sign in with</span>
+          <div className="flex-grow border-t border-slate-200"></div>
+        </div>
+
+        {/* Google Sign-In Button */}
+        <div className="flex justify-center w-full">
+          <div id="google-signin-btn" className="w-full flex justify-center"></div>
         </div>
       </div>
     </div>

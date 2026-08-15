@@ -233,7 +233,7 @@ async function runTests() {
     // 2. Admin Login POST verification
     console.log('\nTest 2: Testing Admin Login (POST /api/auth/login)...');
     const adminUsername = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'AdminPassword123!';
+    const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'AdminSecure2026#SetuAI_!$';
     
     const loginRes = await makeRequest(`${BACKEND_URL}/auth/login`, 'POST', {}, {
       username: adminUsername,

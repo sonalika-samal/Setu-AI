@@ -27,17 +27,20 @@ export interface AppCredentials {
     language: string;
     taskAssignmentTemplate: string;
   };
+  google: {
+    clientId: string;
+  };
 }
 
 export class CredentialRepository {
   async getCredentials(orgId: string = 'default'): Promise<AppCredentials> {
     try {
+      const { config } = require('../config/config');
       const doc = await CredentialModel.findOne({ orgId }) || await CredentialModel.findOne({ key: 'global_config' });
       
       const defaultTemplate = 'Task ID: *```{{task_id}}```*\n\nHello {{worker_name}},\n\nYou have been assigned a new task.\n\nTask:\n{{task_msg}}\n\nLocation:\n{{location}}\n\nDeadline:\n{{deadline}}\n\nPlease reply using the Task ID.\n\nExamples:\n{{task_id}} Started\n{{task_id}} Completed\n{{task_id}} Need more details';
 
       if (!doc) {
-        const { config } = require('../config/config');
         return {
           meta: {
             accessToken: config.meta.accessToken || '',
@@ -62,6 +65,9 @@ export class CredentialRepository {
             reminderOffset3: 30,
             language: 'en',
             taskAssignmentTemplate: defaultTemplate,
+          },
+          google: {
+            clientId: config.google?.clientId || '1234567890-placeholder.apps.googleusercontent.com',
           },
         };
       }
@@ -90,6 +96,9 @@ export class CredentialRepository {
           reminderOffset3: doc.reminderOffset3 ?? 30,
           language: doc.language || 'en',
           taskAssignmentTemplate: doc.taskAssignmentTemplate || defaultTemplate,
+        },
+        google: {
+          clientId: doc.googleClientId || config.google?.clientId || '1234567890-placeholder.apps.googleusercontent.com',
         },
       };
     } catch (error) {
@@ -121,6 +130,7 @@ export class CredentialRepository {
         reminderOffset2: data.settings.reminderOffset2,
         reminderOffset3: data.settings.reminderOffset3,
         language: data.settings.language,
+        googleClientId: data.google?.clientId || '',
         taskAssignmentTemplate: data.settings.taskAssignmentTemplate,
       };
 

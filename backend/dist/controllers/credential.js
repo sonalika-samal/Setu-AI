@@ -8,8 +8,8 @@ const loggingService = new LoggingService_1.LoggingService();
 class CredentialController {
     async getCredentials(req, res, next) {
         try {
-            // Call Service
-            const credentials = await credentialService.getCredentials();
+            const orgId = req.orgId || 'default';
+            const credentials = await credentialService.getCredentials(orgId);
             res.status(200).json(credentials);
         }
         catch (error) {
@@ -18,6 +18,7 @@ class CredentialController {
     }
     async updateCredentials(req, res, next) {
         try {
+            const orgId = req.orgId || 'default';
             const updateData = req.body;
             const user = req.user;
             // 1. Validate Request
@@ -26,9 +27,9 @@ class CredentialController {
                 return;
             }
             // 2. Call Service
-            const updated = await credentialService.updateCredentials(updateData);
+            const updated = await credentialService.updateCredentials(updateData, orgId);
             // Log action
-            await loggingService.logActivity(user?.username || 'system', 'Credentials Modified', 'Sensitive application credentials updated.');
+            await loggingService.logActivity(user?.username || 'system', 'Credentials Modified', 'Sensitive application credentials updated.', orgId);
             // 3. Return Response
             res.status(200).json({
                 message: 'Credentials updated successfully',
@@ -41,7 +42,6 @@ class CredentialController {
     }
     async getDbStatus(req, res, next) {
         try {
-            // Call Service
             const dbInfo = await credentialService.getDatabaseStatus();
             res.status(200).json(dbInfo);
         }

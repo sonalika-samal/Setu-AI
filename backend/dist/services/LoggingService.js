@@ -13,9 +13,9 @@ class LoggingService {
     aiRepo = new AILogRepository_1.AILogRepository();
     activityRepo = new ActivityLogRepository_1.ActivityLogRepository();
     errorRepo = new ErrorLogRepository_1.ErrorLogRepository();
-    async logActivity(username, action, description) {
-        logger_1.logger.info(`Activity logged: ${username} - ${action} - ${description || ''}`);
-        return this.activityRepo.create({ username, action, description });
+    async logActivity(username, action, description, orgId = 'default') {
+        logger_1.logger.info(`Activity logged [${orgId}]: ${username} - ${action} - ${description || ''}`);
+        return this.activityRepo.create({ orgId, username, action, description });
     }
     async getWebhookLogs(limit) {
         return this.webhookRepo.findAll(limit);

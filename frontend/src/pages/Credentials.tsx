@@ -12,7 +12,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   Loader2,
-  Settings
+  Settings,
+  Mail,
+  User
 } from 'lucide-react';
 
 interface DbStatus {
@@ -43,7 +45,152 @@ interface CredentialsData {
     language: string;
     taskAssignmentTemplate: string;
   };
+  google: {
+    clientId: string;
+  };
 }
+
+const AdminAccountCard: React.FC<{ user: any; onSave: () => void; apiFetch: any }> = ({ user: account, onSave, apiFetch }) => {
+  const [username, setUsername] = useState(account.username);
+  const [password, setPassword] = useState(
+    account.username === 'owner' ? 'OwnerSecure2026#SetuAI_!$' :
+    account.username === 'admin' ? 'AdminSecure2026#SetuAI_!$' : ''
+  );
+  const [googleEmail, setGoogleEmail] = useState(account.googleEmail || '');
+  const [showPass, setShowPass] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdating(true);
+    setMsg('');
+    try {
+      const payload: any = {
+        username,
+        googleEmail: googleEmail.trim().toLowerCase(),
+        name: account.name,
+        phone: account.phone,
+        role: account.role
+      };
+      if (password) {
+        payload.password = password;
+      }
+      await apiFetch(`/auth/admins-owners/${account._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      setPassword('');
+      setIsError(false);
+      setMsg('Account credentials updated successfully!');
+      onSave();
+      setTimeout(() => setMsg(''), 4000);
+    } catch (err: any) {
+      setIsError(true);
+      setMsg(err.message || 'Failed to update credentials.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className="p-5 rounded-2xl bg-black/5 dark:bg-black/25 border border-slate-200 dark:border-white/5 space-y-4">
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+          {account.role === 'Owner' ? 'Organisation Head (Owner)' : 'Organisation Administrator (Admin)'}
+        </span>
+        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium italic">{account.name}</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Username ID */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Username / Login ID</label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <User className="w-3.5 h-3.5" />
+            </span>
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs text-slate-850 dark:text-white rounded-lg glass-input"
+            />
+          </div>
+        </div>
+
+        {/* Password */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+            Password <span className="text-[9px] font-normal text-slate-450 lowercase italic">(leave blank to keep)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-450">
+              <Lock className="w-3.5 h-3.5" />
+            </span>
+            <input
+              type={showPass ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full pl-9 pr-8 py-2 text-xs text-slate-850 dark:text-white rounded-lg glass-input"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(!showPass)}
+              className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-500 hover:text-slate-350"
+            >
+              {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Google Email */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Gmail (for Google Login)</label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-450">
+              <Mail className="w-3.5 h-3.5" />
+            </span>
+            <input
+              type="email"
+              value={googleEmail}
+              onChange={(e) => setGoogleEmail(e.target.value)}
+              placeholder="e.g. user@gmail.com"
+              className="w-full pl-9 pr-3 py-2 text-xs text-slate-855 dark:text-white rounded-lg glass-input"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          {msg && (
+            <p className={`text-[11px] font-bold ${isError ? 'text-rose-500' : 'text-emerald-500'}`}>
+              {msg}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleUpdate}
+          disabled={isUpdating}
+          className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-primary to-primary-hover hover:shadow-glow text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50"
+        >
+          {isUpdating ? (
+            <span className="w-3.5 h-3.5 border border-white/20 border-t-white rounded-full animate-spin"></span>
+          ) : (
+            <Save className="w-3.5 h-3.5" />
+          )}
+          Save account settings
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const Credentials: React.FC = () => {
   const { apiFetch, user } = useAuth();
@@ -75,10 +222,20 @@ export const Credentials: React.FC = () => {
 
   const [formData, setFormData] = useState<CredentialsData | null>(null);
 
+  // 3. Fetch administrative users (Owner and Admin)
+  const { data: adminsOwners, refetch: refetchAdmins } = useQuery<any[]>({
+    queryKey: ['admins-owners-creds'],
+    queryFn: () => apiFetch('/auth/admins-owners'),
+    enabled: isOwner,
+  });
+
   // Sync state on fetch complete
   React.useEffect(() => {
     if (credentials) {
-      setFormData(credentials);
+      setFormData({
+        ...credentials,
+        google: credentials.google || { clientId: '' }
+      });
     }
   }, [credentials]);
 
@@ -221,7 +378,7 @@ export const Credentials: React.FC = () => {
 
       {/* Main Settings Form */}
       <form onSubmit={handleSave} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Meta WhatsApp Control Section */}
           <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-6">
             <div className="flex items-center justify-between border-b border-white/5 pb-3">
@@ -390,6 +547,33 @@ export const Credentials: React.FC = () => {
               AI provider abstraction routes calls dynamically depending on active selections. Standard keys are protected locally.
             </div>
           </div>
+
+          {/* Google OAuth Configuration Section */}
+          <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-6 flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+                <Settings className="w-4 h-4 text-primary" />
+                <h3 className="font-bold text-slate-800 dark:text-slate-200">Google OAuth Settings</h3>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Google OAuth Client ID</label>
+                  <input
+                    type="text"
+                    value={formData.google?.clientId || ''}
+                    onChange={(e) => handleInputChange('google', 'clientId', e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs text-slate-850 dark:text-white rounded-lg glass-input"
+                    placeholder="e.g. 123456-xxxx.apps.googleusercontent.com"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-white/5 text-[11px] text-slate-500 leading-relaxed italic">
+              Exposes Gmail Sign-in on the login page. Obtain the Client ID from Google Cloud Console.
+            </div>
+          </div>
         </div>
 
 
@@ -415,6 +599,36 @@ export const Credentials: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Administrative logins and OAuth section */}
+      <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-6 mt-8">
+        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+          <div className="flex items-center gap-3">
+            <Lock className="w-5 h-5 text-primary" />
+            <h3 className="font-extrabold text-slate-800 dark:text-slate-200">Administrative Credentials & Gmail Logins</h3>
+          </div>
+          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
+            Owner Only Access
+          </span>
+        </div>
+
+        {!adminsOwners ? (
+          <div className="flex items-center justify-center p-6">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {adminsOwners.filter(acc => ['Owner', 'Admin'].includes(acc.role)).map(acc => (
+              <AdminAccountCard 
+                key={acc._id} 
+                user={acc} 
+                onSave={refetchAdmins} 
+                apiFetch={apiFetch} 
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -45,6 +45,8 @@ const validateBody = (fields) => {
  *         description: Unauthorized
  */
 router.post('/login', (0, rateLimit_1.rateLimit)({ windowMs: 15 * 60 * 1000, max: 100 }), validateBody(['username', 'password']), authController.login.bind(authController));
+router.get('/google-config', authController.getGoogleConfig.bind(authController));
+router.post('/google-login', (0, rateLimit_1.rateLimit)({ windowMs: 15 * 60 * 1000, max: 100 }), authController.googleLogin.bind(authController));
 /**
  * @swagger
  * /api/auth/signup:

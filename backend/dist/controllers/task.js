@@ -7,7 +7,8 @@ const taskService = new TaskService_1.TaskService();
 class TaskController {
     async getTasks(req, res, next) {
         try {
-            const tasks = await taskService.getTasks();
+            const orgId = req.orgId || 'default';
+            const tasks = await taskService.getTasks(orgId);
             res.status(200).json(tasks);
         }
         catch (error) {
@@ -18,7 +19,8 @@ class TaskController {
         try {
             const taskData = req.body;
             const user = req.user;
-            const task = await taskService.createTask(taskData, user?.username || 'system');
+            const orgId = req.orgId || 'default';
+            const task = await taskService.createTask(taskData, user?.username || 'system', orgId);
             // Emit live creation event
             const io = req.app.get('io');
             if (io) {
@@ -38,7 +40,8 @@ class TaskController {
     }
     async getDashboardStats(req, res, next) {
         try {
-            const stats = await taskService.getStats();
+            const orgId = req.orgId || 'default';
+            const stats = await taskService.getStats(orgId);
             res.status(200).json(stats);
         }
         catch (error) {

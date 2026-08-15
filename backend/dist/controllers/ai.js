@@ -8,11 +8,12 @@ class AIController {
         try {
             const { message, history } = req.body;
             const user = req.user;
+            const orgId = req.orgId || 'default';
             if (!message) {
                 res.status(400).json({ message: 'Message is required.' });
                 return;
             }
-            const reply = await ownerAIService.chat(message, history || [], user?.username || 'system');
+            const reply = await ownerAIService.chat(message, history || [], user?.username || 'system', orgId);
             res.status(200).json({ reply });
         }
         catch (error) {

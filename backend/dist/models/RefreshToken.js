@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RefreshTokenModel = void 0;
 const mongoose_1 = require("mongoose");
 const RefreshTokenSchema = new mongoose_1.Schema({
+    orgId: { type: String, required: true, default: 'default', index: true },
     user_id: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
     token: { type: String, required: true, unique: true, index: true },
     expires_at: { type: Date, required: true, index: true },

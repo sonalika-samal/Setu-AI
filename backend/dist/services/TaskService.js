@@ -16,16 +16,17 @@ const whatsAppService = new WhatsAppService_1.WhatsAppService();
 class TaskService {
     taskRepo = new TaskRepository_1.TaskRepository();
     timelineRepo = new TaskTimelineRepository_1.TaskTimelineRepository();
-    async getTasks() {
-        return this.taskRepo.findAll();
+    async getTasks(orgId = 'default') {
+        return this.taskRepo.findAll(orgId);
     }
-    async generateNextTaskId() {
+    async generateNextTaskId(orgId = 'default') {
         const now = new Date();
         const day = String(now.getDate()).padStart(2, '0');
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const year = now.getFullYear();
         const dateStr = `${day}${month}${year}`;
         const tasksToday = await Task_1.TaskModel.find({
+            orgId,
             taskId: new RegExp(`^${dateStr}T`)
         }).select('taskId').lean();
         let maxNumber = 0;
@@ -41,11 +42,12 @@ class TaskService {
         const nextNumber = maxNumber + 1;
         return `${dateStr}T${nextNumber}`;
     }
-    async createTask(taskData, performedBy) {
-        logger_1.logger.info(`Creating task with message: ${taskData.task_msg}`);
-        const taskIdGenerated = await this.generateNextTaskId();
+    async createTask(taskData, performedBy, orgId = 'default') {
+        logger_1.logger.info(`Creating task with message for org ${orgId}: ${taskData.task_msg}`);
+        const taskIdGenerated = await this.generateNextTaskId(orgId);
         // Set Phase 3 default tracking fields if not set
         const mergedData = {
+            orgId,
             taskId: taskIdGenerated,
             task_status: 'Open',
             owner_name: performedBy,
@@ -56,6 +58,7 @@ class TaskService {
         const task = await this.taskRepo.create(mergedData);
         // Log timeline event
         await this.timelineRepo.create({
+            orgId,
             task_id: task._id.toString(),
             action: 'Task Created',
             description: `Task was initially registered by ${performedBy}.`,
@@ -70,17 +73,18 @@ class TaskService {
         }
         return task;
     }
-    async getStats() {
+    async getStats(orgId = 'default') {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
-        const total = await Task_1.TaskModel.countDocuments({});
-        const open = await Task_1.TaskModel.countDocuments({ task_status: 'Open' });
-        const started = await Task_1.TaskModel.countDocuments({ task_status: 'Started' });
-        const details = await Task_1.TaskModel.countDocuments({ task_status: 'More Details Asked' });
-        const completed = await Task_1.TaskModel.countDocuments({ task_status: 'Completed' });
-        const closed = await Task_1.TaskModel.countDocuments({ task_status: 'Closed' });
+        const total = await Task_1.TaskModel.countDocuments({ orgId });
+        const open = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Open' });
+        const started = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Started' });
+        const details = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'More Details Asked' });
+        const completed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Completed' });
+        const closed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Closed' });
         // Overdue tasks: status is not Completed/Closed and (is_overdue is true OR deadline has passed)
         const overdue = await Task_1.TaskModel.countDocuments({
+            orgId,
             task_status: { $nin: ['Completed', 'Closed'] },
             $or: [
                 { is_overdue: true },
@@ -89,12 +93,13 @@ class TaskService {
         });
         // Escalated tasks: status is not Completed/Closed and is_escalated is true
         const escalated = await Task_1.TaskModel.countDocuments({
+            orgId,
             task_status: { $nin: ['Completed', 'Closed'] },
             is_escalated: true
         });
         // Workers online (Active) vs offline (Inactive)
-        const online = await User_1.UserModel.countDocuments({ role: 'Worker', status: 'Active' });
-        const offline = await User_1.UserModel.countDocuments({ role: 'Worker', status: 'Inactive' });
+        const online = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', status: 'Active' });
+        const offline = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', status: 'Inactive' });
         // Active today: tasks updated since start of today
         const activeToday = await Task_1.TaskModel.countDocuments({
             updatedAt: { $gte: startOfToday }
@@ -304,7 +309,7 @@ class TaskService {
                 if (isReassigned) {
                     // A. Notify old worker of cancellation (if any)
                     if (oldWorkerPhone) {
-                        const oldCancelMsg = `Task ID: *${'```'}${taskIdGenerated}${'```'}*\n\nHello ${oldWorkerName},\n\nThis task has been unassigned from you and reassigned to another worker. You do not need to work on it anymore. Thank you!`;
+                        const oldCancelMsg = `Task ID: *${'```'}${taskIdGenerated}${'```'}*\n\nHello ${oldWorkerName},\n\nThis task has been unassigned from you and reassigned to another staff member. You do not need to work on it anymore. Thank you!`;
                         await whatsAppService.sendMessage(oldWorkerPhone, oldCancelMsg);
                         logger_1.logger.info(`WhatsApp cancellation dispatched to old worker ${oldWorkerPhone}`);
                     }
@@ -319,19 +324,19 @@ class TaskService {
                         dispatchMsg = dispatchMsg.replace(/{{task_msg}}/g, task.task_msg);
                         dispatchMsg = dispatchMsg.replace(/{{location}}/g, task.location || 'N/A');
                         dispatchMsg = dispatchMsg.replace(/{{deadline}}/g, task.deadline ? new Date(task.deadline).toLocaleString('en-IN', { timeZone: creds.settings.timezone || 'Asia/Kolkata' }) : 'N/A');
-                        dispatchMsg = dispatchMsg.replace(/{{company_name}}/g, creds.settings.businessName || 'Sahayak AI');
+                        dispatchMsg = dispatchMsg.replace(/{{company_name}}/g, creds.settings.businessName || 'Setu AI by DotnLott');
                         dispatchMsg = dispatchMsg.replace(/{{instructions}}/g, 'Please reply using the Task ID.');
                         if (!dispatchMsg.startsWith('Task ID:')) {
                             dispatchMsg = `Task ID: *${'```'}${taskIdGenerated}${'```'}*\n\n${dispatchMsg}`;
                         }
                         if (isNewWorkerUnavailable) {
-                            dispatchMsg += '\n\n⚠️ Our records indicate that you are currently marked as unavailable.\n\nIf you are available to perform this task, simply reply and continue as normal.\n\nIf you are unavailable today, please contact the Owner immediately.';
+                            dispatchMsg += '\n\n⚠️ Our records indicate that you are currently marked as unavailable.\n\nIf you are available to perform this task, simply reply and continue as normal.\n\nIf you are unavailable today, please contact the Organisation Head immediately.';
                         }
                         await whatsAppService.sendMessage(task.worker_phone, dispatchMsg);
                         logger_1.logger.info(`WhatsApp dispatch message sent to new worker ${task.worker_phone}`);
                         // Notify Owner if worker is unavailable
                         if (isNewWorkerUnavailable && task.owner_phone) {
-                            const ownerAlertMsg = `⚠️ Worker Availability Alert\n\nTask ID: *${'```'}${taskIdGenerated}${'```'}*\n\nWorker: ${task.worker_name}\n\nThe assigned worker is currently marked as unavailable.\n\nThe task has still been assigned, and a notification has been sent to the worker informing them of their unavailable status.\n\nIf required, please contact the worker directly or reassign the task.`;
+                            const ownerAlertMsg = `⚠️ Staff Member Availability Alert\n\nTask ID: *${'```'}${taskIdGenerated}${'```'}*\n\nStaff Member: ${task.worker_name}\n\nThe assigned staff member is currently marked as unavailable.\n\nThe task has still been assigned, and a notification has been sent to the staff member informing them of their unavailable status.\n\nIf required, please contact the staff member directly or reassign the task.`;
                             try {
                                 await whatsAppService.sendMessage(task.owner_phone, ownerAlertMsg);
                                 logger_1.logger.info(`Dispatched worker unavailability alert to Owner ${task.owner_phone}`);
@@ -347,9 +352,9 @@ class TaskService {
                     const currentWorkerUser = await User_1.UserModel.findOne({ phone: task.worker_phone });
                     const isCurrentWorkerUnavailable = currentWorkerUser?.availability_status === 'Unavailable';
                     // C. Notify currently assigned worker of details update
-                    let updateMsg = `Task ID: *${'```'}${taskIdGenerated}${'```'}*\n\nHello ${task.worker_name},\n\nYour assigned task details have been updated by the Owner.\n\nUpdated Details:\nTask:\n${task.task_msg}\n\nLocation:\n${task.location || 'N/A'}\n\nDeadline:\n${task.deadline ? new Date(task.deadline).toLocaleString('en-IN', { timeZone: creds.settings.timezone || 'Asia/Kolkata' }) : 'N/A'}\n\nPlease reply using the Task ID.`;
+                    let updateMsg = `Task ID: *${'```'}${taskIdGenerated}${'```'}*\n\nHello ${task.worker_name},\n\nYour assigned task details have been updated by the Organisation Head.\n\nUpdated Details:\nTask:\n${task.task_msg}\n\nLocation:\n${task.location || 'N/A'}\n\nDeadline:\n${task.deadline ? new Date(task.deadline).toLocaleString('en-IN', { timeZone: creds.settings.timezone || 'Asia/Kolkata' }) : 'N/A'}\n\nPlease reply using the Task ID.`;
                     if (isCurrentWorkerUnavailable) {
-                        updateMsg += '\n\n⚠️ Our records indicate that you are currently marked as unavailable.\n\nIf you are available to perform this task, simply reply and continue as normal.\n\nIf you are unavailable today, please contact the Owner immediately.';
+                        updateMsg += '\n\n⚠️ Our records indicate that you are currently marked as unavailable.\n\nIf you are available to perform this task, simply reply and continue as normal.\n\nIf you are unavailable today, please contact the Organisation Head immediately.';
                     }
                     await whatsAppService.sendMessage(task.worker_phone, updateMsg);
                     logger_1.logger.info(`WhatsApp details update message sent to worker ${task.worker_phone}`);

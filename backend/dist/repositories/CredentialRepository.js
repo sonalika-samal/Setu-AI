@@ -5,13 +5,12 @@ const Credential_1 = require("../models/Credential");
 const encryption_1 = require("../services/encryption");
 const logger_1 = require("../utils/logger");
 class CredentialRepository {
-    static GLOBAL_KEY = 'global_config';
-    async getCredentials() {
+    async getCredentials(orgId = 'default') {
         try {
-            const doc = await Credential_1.CredentialModel.findOne({ key: CredentialRepository.GLOBAL_KEY });
+            const { config } = require('../config/config');
+            const doc = await Credential_1.CredentialModel.findOne({ orgId }) || await Credential_1.CredentialModel.findOne({ key: 'global_config' });
             const defaultTemplate = 'Task ID: *```{{task_id}}```*\n\nHello {{worker_name}},\n\nYou have been assigned a new task.\n\nTask:\n{{task_msg}}\n\nLocation:\n{{location}}\n\nDeadline:\n{{deadline}}\n\nPlease reply using the Task ID.\n\nExamples:\n{{task_id}} Started\n{{task_id}} Completed\n{{task_id}} Need more details';
             if (!doc) {
-                const { config } = require('../config/config');
                 return {
                     meta: {
                         accessToken: config.meta.accessToken || '',
@@ -28,7 +27,7 @@ class CredentialRepository {
                         classificationModel: config.sarvam.classificationModel || '',
                     },
                     settings: {
-                        businessName: 'Sahayak AI',
+                        businessName: 'Setu AI by DotnLott',
                         timezone: 'Asia/Kolkata',
                         reminderOffset: 30,
                         reminderOffset1: 180,
@@ -36,6 +35,9 @@ class CredentialRepository {
                         reminderOffset3: 30,
                         language: 'en',
                         taskAssignmentTemplate: defaultTemplate,
+                    },
+                    google: {
+                        clientId: config.google?.clientId || '1234567890-placeholder.apps.googleusercontent.com',
                     },
                 };
             }
@@ -55,7 +57,7 @@ class CredentialRepository {
                     classificationModel: doc.sarvamClassificationModel || '',
                 },
                 settings: {
-                    businessName: doc.businessName || 'Sahayak AI',
+                    businessName: doc.businessName || 'Setu AI by DotnLott',
                     timezone: doc.timezone || 'Asia/Kolkata',
                     reminderOffset: doc.reminderOffset ?? 30,
                     reminderOffset1: doc.reminderOffset1 ?? 180,
@@ -64,16 +66,20 @@ class CredentialRepository {
                     language: doc.language || 'en',
                     taskAssignmentTemplate: doc.taskAssignmentTemplate || defaultTemplate,
                 },
+                google: {
+                    clientId: doc.googleClientId || config.google?.clientId || '1234567890-placeholder.apps.googleusercontent.com',
+                },
             };
         }
         catch (error) {
-            logger_1.logger.error(`Error loading credentials: ${error.message}`);
+            logger_1.logger.error(`Error loading credentials for org ${orgId}: ${error.message}`);
             throw error;
         }
     }
-    async updateCredentials(data) {
+    async updateCredentials(data, orgId = 'default') {
         try {
             const updateData = {
+                orgId,
                 metaAccessToken: (0, encryption_1.encrypt)(data.meta.accessToken),
                 metaPhoneNumberId: data.meta.phoneNumberId,
                 metaBusinessId: data.meta.businessId,
@@ -91,13 +97,14 @@ class CredentialRepository {
                 reminderOffset2: data.settings.reminderOffset2,
                 reminderOffset3: data.settings.reminderOffset3,
                 language: data.settings.language,
+                googleClientId: data.google?.clientId || '',
                 taskAssignmentTemplate: data.settings.taskAssignmentTemplate,
             };
-            await Credential_1.CredentialModel.findOneAndUpdate({ key: CredentialRepository.GLOBAL_KEY }, { $set: updateData }, { new: true, upsert: true });
+            await Credential_1.CredentialModel.findOneAndUpdate({ orgId }, { $set: updateData }, { new: true, upsert: true });
             return data;
         }
         catch (error) {
-            logger_1.logger.error(`Error updating credentials: ${error.message}`);
+            logger_1.logger.error(`Error updating credentials for org ${orgId}: ${error.message}`);
             throw error;
         }
     }

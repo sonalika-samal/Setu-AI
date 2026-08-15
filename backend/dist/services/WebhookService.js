@@ -95,7 +95,7 @@ class WebhookService {
     /**
      * Main entry point called asynchronously to execute the complete task assignment pipeline
      */
-    async processWebhook(payload, io) {
+    async processWebhook(payload, io, orgId = 'default') {
         let logDoc = null;
         let senderPhone = '';
         let senderName = 'WhatsApp Contact';
@@ -107,7 +107,7 @@ class WebhookService {
             const value = change?.value;
             const msgObj = value?.messages?.[0];
             if (!msgObj) {
-                logger_1.logger.warn('processWebhook: No message payload found.');
+                logger_1.logger.warn(`processWebhook [${orgId}]: No message payload found.`);
                 return;
             }
             messageId = msgObj.id;
@@ -116,13 +116,14 @@ class WebhookService {
             senderName = contactObj?.profile?.name || 'WhatsApp Contact';
             messageType = msgObj.type;
             // Deduplicate: Check if message has already been processed or is currently processing
-            const existingLog = await WebhookLog_1.WebhookLogModel.findOne({ message_id: messageId });
+            const existingLog = await WebhookLog_1.WebhookLogModel.findOne({ orgId, message_id: messageId });
             if (existingLog) {
-                logger_1.logger.info(`processWebhook: Message ${messageId} already exists in database. Skipping duplicate.`);
+                logger_1.logger.info(`processWebhook [${orgId}]: Message ${messageId} already exists in database. Skipping duplicate.`);
                 return;
             }
             // 1. Initial State: Log webhook as received
             logDoc = await WebhookLog_1.WebhookLogModel.create({
+                orgId,
                 sender_name: senderName,
                 sender_phone: senderPhone,
                 message_id: messageId,
@@ -133,11 +134,12 @@ class WebhookService {
                 payload,
             });
             this.emitSocketUpdate(io, logDoc);
-            await loggingService.logActivity('system', 'Webhook Received', `Inbound webhook message ${messageId} recorded.`);
+            await loggingService.logActivity('system', 'Webhook Received', `Inbound webhook message ${messageId} recorded.`, orgId);
             // 2. Identify sender role in database
             const cleanSenderPhone = senderPhone.replace('+', '').trim();
-            const sender = await User_1.UserModel.findOne({ username: senderPhone });
+            const sender = await User_1.UserModel.findOne({ orgId, username: senderPhone });
             const senderByPhone = sender || await User_1.UserModel.findOne({
+                orgId,
                 $or: [
                     { phone: senderPhone },
                     { phone: cleanSenderPhone },
@@ -145,16 +147,16 @@ class WebhookService {
                 ]
             });
             if (!senderByPhone) {
-                logger_1.logger.warn(`processWebhook: Sender ${senderPhone} not found in user database.`);
+                logger_1.logger.warn(`processWebhook [${orgId}]: Sender ${senderPhone} not found in user database.`);
                 logDoc.processing_status = 'failed';
                 await logDoc.save();
                 this.emitSocketUpdate(io, logDoc);
-                await loggingService.logActivity('system', 'Unknown Sender', `Message from unregistered phone ${senderPhone} ignored by system.`);
+                await loggingService.logActivity('system', 'Unknown Sender', `Message from unregistered phone ${senderPhone} ignored by system.`, orgId);
                 try {
-                    await whatsAppService.sendMessage(senderPhone, "Sorry, your number is not registered in Sahayak AI. Please contact the administrator.");
+                    await whatsAppService.sendMessage(senderPhone, "Sorry, your number is not registered in Setu AI by DotnLott. Please contact the administrator.", orgId);
                 }
                 catch (waErr) {
-                    await loggingService.logActivity('system', 'WhatsApp Failure', `Failed to notify unknown sender: ${waErr.message}`);
+                    await loggingService.logActivity('system', 'WhatsApp Failure', `Failed to notify unknown sender: ${waErr.message}`, orgId);
                 }
                 return;
             }
@@ -378,7 +380,7 @@ class WebhookService {
                         await loggingService.logActivity(senderUsername, 'Proof Uploaded', `Worker ${workerDoc.name} uploaded proof of work file "${originalFilename || filename}" for task ${matchedTask.taskId || matchedTask._id}.`);
                         // If task is not Completed/Closed, see if we need to update the status from the caption
                         if (!['Completed', 'Closed'].includes(matchedTask.task_status)) {
-                            const classificationPrompt = `You are a reply status classifier for Sahayak AI.
+                            const classificationPrompt = `You are a reply status classifier for Setu AI.
 Classify the worker's reply into exactly one of these task statuses:
 1. Started: Acknowledged, started, on the way, okay, ok, working, in progress (e.g. "got it", "repaired started", "working on it").
 2. Completed: Done, fixed, completed, finished (e.g. "finished", "completed", "done").
@@ -672,7 +674,7 @@ Output exactly one of the words: Started, Completed, or More Details Asked. Do n
                 logDoc.processing_status = 'ai_processing';
                 await logDoc.save();
                 this.emitSocketUpdate(io, logDoc);
-                const questionCheckPrompt = `You are an AI assistant for Sahayak AI.
+                const questionCheckPrompt = `You are an AI assistant for Setu AI.
 Worker message: "${textToClassify}"
 
 Classify this message into one of these categories:
@@ -797,7 +799,7 @@ ${defaultEx} Completed`;
                 incomingMsgLog.task_id = selectedTask._id;
                 await incomingMsgLog.save();
                 // Perform classification and status updates
-                const classificationPrompt = `You are a reply status classifier for Sahayak AI.
+                const classificationPrompt = `You are a reply status classifier for Setu AI.
 Classify the worker's reply into exactly one of these task statuses:
 1. Started: Acknowledged, started, on the way, okay, ok, working, in progress (e.g. "got it", "repaired started", "working on it").
 2. Completed: Done, finished, repaired, fixed, completed (e.g. "finished the work", "repaired successfully", "done").
@@ -929,7 +931,7 @@ Output exactly one of the words: Started, Completed, or More Details Asked. Do n
                 await logDoc.save();
                 this.emitSocketUpdate(io, logDoc);
                 await loggingService.logActivity(senderUsername, 'AI Started', 'Classifying Owner request (TASK_CREATION vs QUERY).');
-                const ownerTypePrompt = `You are a message classifier for Sahayak AI.
+                const ownerTypePrompt = `You are a message classifier for Setu AI.
 An Owner has sent a message. Classify if it is a task creation request or a status inquiry query:
 - TASK_CREATION: The message assigns a new task to a worker or has instructions to create a task (e.g., "Assign Ramesh to fix the tap tomorrow", "Tell Suresh to clean the lobby").
 - QUERY: The message is a question or request for information about tasks, workers, logs, or general status (e.g., "How many tasks are open?", "What is Suresh doing?", "Which workers are working?").
@@ -1149,7 +1151,7 @@ JSON Schema:
         dispatchMsg = dispatchMsg.replace(/{{task_msg}}/g, task.task_msg);
         dispatchMsg = dispatchMsg.replace(/{{location}}/g, task.location || 'N/A');
         dispatchMsg = dispatchMsg.replace(/{{deadline}}/g, deadlineDate.toLocaleString('en-IN', { timeZone: creds.settings.timezone || 'Asia/Kolkata' }));
-        dispatchMsg = dispatchMsg.replace(/{{company_name}}/g, creds.settings.businessName || 'Sahayak AI');
+        dispatchMsg = dispatchMsg.replace(/{{company_name}}/g, creds.settings.businessName || 'Setu AI by DotnLott');
         dispatchMsg = dispatchMsg.replace(/{{instructions}}/g, 'Please reply using the Task ID.');
         // Ensure it begins with Task ID
         if (!dispatchMsg.startsWith('Task ID:')) {

@@ -9,18 +9,18 @@ function escapeRegex(str) {
     return str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 class QueryService {
-    async executeQuery(operation, parameters = {}) {
-        logger_1.logger.info(`QueryService: Executing predefined operation: ${operation} with parameters: ${JSON.stringify(parameters)}`);
+    async executeQuery(operation, parameters = {}, orgId = 'default') {
+        logger_1.logger.info(`QueryService: Executing operation ${operation} for org ${orgId} with params: ${JSON.stringify(parameters)}`);
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
         try {
             switch (operation.toUpperCase()) {
                 case 'GET_OPEN_TASKS':
-                    return await Task_1.TaskModel.find({ task_status: 'Open' }).sort({ createdAt: -1 }).lean();
+                    return await Task_1.TaskModel.find({ orgId, task_status: 'Open' }).sort({ createdAt: -1 }).lean();
                 case 'GET_COMPLETED_TASKS':
-                    return await Task_1.TaskModel.find({ task_status: 'Completed' }).sort({ completed_time: -1 }).lean();
+                    return await Task_1.TaskModel.find({ orgId, task_status: 'Completed' }).sort({ completed_time: -1 }).lean();
                 case 'GET_STARTED_TASKS':
-                    return await Task_1.TaskModel.find({ task_status: 'Started' }).sort({ started_time: -1 }).lean();
+                    return await Task_1.TaskModel.find({ orgId, task_status: 'Started' }).sort({ started_time: -1 }).lean();
                 case 'GET_WORKER_STATUS':
                 case 'GET_WORKER_TASKS': {
                     const workerName = parameters.workerName || '';
@@ -29,10 +29,11 @@ class QueryService {
                     }
                     // First, find the worker to get correct name
                     const worker = await User_1.UserModel.findOne({
+                        orgId,
                         name: { $regex: new RegExp(escapeRegex(workerName), 'i') },
                         role: 'Worker'
                     }).lean();
-                    const queryFilter = {};
+                    const queryFilter = { orgId };
                     if (worker) {
                         queryFilter.worker_id = worker._id.toString();
                     }
@@ -57,6 +58,7 @@ class QueryService {
                 }
                 case 'GET_OVERDUE_TASKS':
                     return await Task_1.TaskModel.find({
+                        orgId,
                         task_status: { $nin: ['Completed', 'Closed'] },
                         $or: [
                             { is_overdue: true },
@@ -64,48 +66,54 @@ class QueryService {
                         ]
                     }).sort({ deadline: 1 }).lean();
                 case 'GET_CLOSED_TASKS':
-                    return await Task_1.TaskModel.find({ task_status: 'Closed' }).sort({ closed_time: -1 }).lean();
+                    return await Task_1.TaskModel.find({ orgId, task_status: 'Closed' }).sort({ closed_time: -1 }).lean();
                 case 'GET_TODAY_TASKS':
                     return await Task_1.TaskModel.find({
+                        orgId,
                         createdAt: { $gte: startOfToday }
                     }).sort({ createdAt: -1 }).lean();
                 case 'GET_PENDING_TASKS':
                     return await Task_1.TaskModel.find({
+                        orgId,
                         task_status: { $in: ['Open', 'Started', 'More Details Asked'] }
                     }).sort({ createdAt: -1 }).lean();
                 case 'GET_MORE_DETAILS_TASKS':
                     return await Task_1.TaskModel.find({
+                        orgId,
                         task_status: 'More Details Asked'
                     }).sort({ updatedAt: -1 }).lean();
                 case 'GET_ACTIVITY_LOGS':
-                    return await ActivityLog_1.ActivityLogModel.find().sort({ timestamp: -1 }).limit(20).lean();
+                    return await ActivityLog_1.ActivityLogModel.find({ orgId }).sort({ timestamp: -1 }).limit(20).lean();
                 case 'GET_TASK_DETAILS': {
                     const taskId = parameters.taskId;
                     if (taskId) {
-                        const task = await Task_1.TaskModel.findOne({ taskId }).lean();
+                        const task = await Task_1.TaskModel.findOne({ orgId, taskId }).lean();
                         if (task)
                             return task;
                         const mongoose = require('mongoose');
                         if (mongoose.Types.ObjectId.isValid(taskId)) {
-                            return await Task_1.TaskModel.findById(taskId).lean();
+                            return await Task_1.TaskModel.findOne({ orgId, _id: taskId }).lean();
                         }
                         return null;
                     }
                     const workerName = parameters.workerName || '';
                     return await Task_1.TaskModel.findOne({
+                        orgId,
                         worker_name: { $regex: new RegExp(escapeRegex(workerName), 'i') }
                     }).sort({ createdAt: -1 }).lean();
                 }
                 case 'GET_WORKER_SUMMARY': {
-                    const workers = await User_1.UserModel.find({ role: 'Worker' }).lean();
+                    const workers = await User_1.UserModel.find({ orgId, role: 'Worker' }).lean();
                     const summary = [];
                     for (const worker of workers) {
                         const workerObj = worker;
                         const activeCount = await Task_1.TaskModel.countDocuments({
+                            orgId,
                             worker_id: worker._id.toString(),
                             task_status: { $in: ['Open', 'Started', 'More Details Asked'] }
                         });
                         const completedCount = await Task_1.TaskModel.countDocuments({
+                            orgId,
                             worker_id: worker._id.toString(),
                             task_status: 'Completed'
                         });
@@ -126,13 +134,14 @@ class QueryService {
                     return summary;
                 }
                 case 'GET_DASHBOARD_SUMMARY': {
-                    const total = await Task_1.TaskModel.countDocuments({});
-                    const open = await Task_1.TaskModel.countDocuments({ task_status: 'Open' });
-                    const started = await Task_1.TaskModel.countDocuments({ task_status: 'Started' });
-                    const details = await Task_1.TaskModel.countDocuments({ task_status: 'More Details Asked' });
-                    const completed = await Task_1.TaskModel.countDocuments({ task_status: 'Completed' });
-                    const closed = await Task_1.TaskModel.countDocuments({ task_status: 'Closed' });
+                    const total = await Task_1.TaskModel.countDocuments({ orgId });
+                    const open = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Open' });
+                    const started = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Started' });
+                    const details = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'More Details Asked' });
+                    const completed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Completed' });
+                    const closed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Closed' });
                     const overdue = await Task_1.TaskModel.countDocuments({
+                        orgId,
                         task_status: { $nin: ['Completed', 'Closed'] },
                         $or: [
                             { is_overdue: true },
@@ -140,12 +149,14 @@ class QueryService {
                         ]
                     });
                     const escalated = await Task_1.TaskModel.countDocuments({
+                        orgId,
                         task_status: { $nin: ['Completed', 'Closed'] },
                         is_escalated: true
                     });
-                    const online = await User_1.UserModel.countDocuments({ role: 'Worker', status: 'Active' });
-                    const offline = await User_1.UserModel.countDocuments({ role: 'Worker', status: 'Inactive' });
+                    const online = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', status: 'Active' });
+                    const offline = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', status: 'Inactive' });
                     const activeToday = await Task_1.TaskModel.countDocuments({
+                        orgId,
                         updatedAt: { $gte: startOfToday }
                     });
                     return {
@@ -164,19 +175,19 @@ class QueryService {
                 }
                 case 'GET_DEPARTMENTS': {
                     const { DepartmentModel } = require('../models/Department');
-                    return await DepartmentModel.find().sort({ name: 1 }).lean();
+                    return await DepartmentModel.find({ orgId }).sort({ name: 1 }).lean();
                 }
                 case 'GET_NOTIFICATIONS': {
                     const { NotificationModel } = require('../models/Notification');
-                    return await NotificationModel.find().sort({ timestamp: -1 }).limit(10).lean();
+                    return await NotificationModel.find({ orgId }).sort({ timestamp: -1 }).limit(10).lean();
                 }
                 case 'GET_PROOF_OF_WORK': {
                     const taskId = parameters.taskId;
                     if (taskId) {
-                        const task = await Task_1.TaskModel.findOne({ taskId }).select('taskId worker_name proof_of_work').lean();
+                        const task = await Task_1.TaskModel.findOne({ orgId, taskId }).select('taskId worker_name proof_of_work').lean();
                         return task ? task.proof_of_work : [];
                     }
-                    const tasksWithProof = await Task_1.TaskModel.find({ 'proof_of_work.0': { $exists: true } })
+                    const tasksWithProof = await Task_1.TaskModel.find({ orgId, 'proof_of_work.0': { $exists: true } })
                         .select('taskId worker_name proof_of_work')
                         .sort({ updatedAt: -1 })
                         .lean();
@@ -194,21 +205,22 @@ class QueryService {
                 }
                 case 'GET_SECURITY_LOGS': {
                     const { SecurityLogModel } = require('../models/SecurityLog');
-                    return await SecurityLogModel.find().sort({ timestamp: -1 }).limit(20).lean();
+                    return await SecurityLogModel.find({ orgId }).sort({ timestamp: -1 }).limit(20).lean();
                 }
                 case 'GET_REPORTS': {
-                    const totalTasks = await Task_1.TaskModel.countDocuments({});
-                    const completed = await Task_1.TaskModel.countDocuments({ task_status: 'Completed' });
-                    const open = await Task_1.TaskModel.countDocuments({ task_status: 'Open' });
-                    const started = await Task_1.TaskModel.countDocuments({ task_status: 'Started' });
-                    const details = await Task_1.TaskModel.countDocuments({ task_status: 'More Details Asked' });
-                    const closed = await Task_1.TaskModel.countDocuments({ task_status: 'Closed' });
+                    const totalTasks = await Task_1.TaskModel.countDocuments({ orgId });
+                    const completed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Completed' });
+                    const open = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Open' });
+                    const started = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Started' });
+                    const details = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'More Details Asked' });
+                    const closed = await Task_1.TaskModel.countDocuments({ orgId, task_status: 'Closed' });
                     const overdue = await Task_1.TaskModel.countDocuments({
+                        orgId,
                         task_status: { $nin: ['Completed', 'Closed'] },
                         deadline: { $lt: new Date() }
                     });
-                    const activeWorkers = await User_1.UserModel.countDocuments({ role: 'Worker', worker_status: 'Enabled' });
-                    const disabledWorkers = await User_1.UserModel.countDocuments({ role: 'Worker', worker_status: 'Disabled' });
+                    const activeWorkers = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', worker_status: 'Enabled' });
+                    const disabledWorkers = await User_1.UserModel.countDocuments({ orgId, role: 'Worker', worker_status: 'Disabled' });
                     return {
                         totalTasks,
                         completed,

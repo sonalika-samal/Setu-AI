@@ -95,8 +95,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2 lg:hidden">
-              <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center">
-                <img src="/logo-transparent-2.png" alt="Logo" className="w-[170%] h-[170%] max-w-none object-cover" />
+              <div className="w-7 h-7 flex items-center justify-center">
+                <img src="/logo-transparent-2.png" alt="Logo" className="w-full h-full object-contain" />
               </div>
               <span className="font-extrabold text-sm tracking-wider text-gradient">SETU AI</span>
             </div>

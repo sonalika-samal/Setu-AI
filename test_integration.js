@@ -120,12 +120,12 @@ async function runTests() {
     }
     console.log('--------------------------------------------------\n');
 
-    // Test 3: Log in as default admin
-    console.log('Test 3: Testing Admin Login (POST /api/auth/login)...');
+    // Test 3: Log in as default owner
+    console.log('Test 3: Testing Owner Login (POST /api/auth/login)...');
     const loginUrl = `${BACKEND_URL}/auth/login`;
     const loginPayload = {
-      username: 'admin',
-      password: 'AdminPassword123!'
+      username: 'owner',
+      password: 'OwnerSecure2026#SetuAI_!$'
     };
 
     const loginRes = await makeRequest(loginUrl, 'POST', {}, loginPayload);
@@ -133,7 +133,7 @@ async function runTests() {
     const loginData = JSON.parse(loginRes.body);
     
     if (loginRes.statusCode === 200 && loginData.token) {
-      console.log('✓ PASS: Admin authentication successful! Token obtained.');
+      console.log('✓ PASS: Owner authentication successful! Token obtained.');
       
       // Test 4: Retrieve database status using Bearer token
       console.log('\nTest 4: Retrieve Database Status (GET /api/credentials/db-status)...');

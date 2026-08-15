@@ -70,8 +70,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
       {/* Brand Header */}
       <div className="p-6 border-b border-border flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-            <img src="/logo-transparent-2.png" alt="Setu AI Logo" className="w-[170%] h-[170%] max-w-none object-cover" />
+          <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+            <img src="/logo-transparent-2.png" alt="Setu AI Logo" className="w-full h-full object-contain" />
           </div>
           <div className="pt-1">
             <h1 className="font-extrabold text-lg leading-tight tracking-wider text-gradient">SETU AI</h1>
