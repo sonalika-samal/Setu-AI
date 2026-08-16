@@ -657,7 +657,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <div className="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto">
             {/* Status Filter */}
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full sm:w-auto">
               <Layers className="w-3.5 h-3.5 text-slate-500" />
