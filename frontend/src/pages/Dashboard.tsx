@@ -659,12 +659,12 @@ export const Dashboard: React.FC = () => {
 
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5 w-full sm:w-auto">
             {/* Status Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full sm:w-auto">
               <Layers className="w-3.5 h-3.5 text-slate-500" />
               <select 
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:w-auto"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Statuses</option>
                 <option value="Open" className="bg-white text-slate-800">Open</option>
@@ -676,12 +676,12 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Priority Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full sm:w-auto">
               <Shield className="w-3.5 h-3.5 text-slate-500" />
               <select 
                 value={priorityFilter}
                 onChange={e => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:w-auto"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Priorities</option>
                 <option value="Low" className="bg-white text-slate-800">Low</option>
@@ -691,7 +691,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Worker Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full sm:w-auto">
               <UserCheck className="w-3.5 h-3.5 text-slate-500" />
               <select 
                 value={workerFilter}
