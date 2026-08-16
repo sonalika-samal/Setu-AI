@@ -543,7 +543,7 @@ export const Dashboard: React.FC = () => {
       filterId: 'Started'
     },
     {
-      title: 'More Details Asked',
+      title: 'Details Asked',
       value: stats?.details ?? 0,
       icon: Info,
       color: 'from-pink-500 via-rose-500 to-red-500 border-pink-500/20 text-white shadow-lg shadow-pink-500/10',
