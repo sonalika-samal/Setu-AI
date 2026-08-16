@@ -696,7 +696,7 @@ export const Dashboard: React.FC = () => {
               <select 
                 value={workerFilter}
                 onChange={e => { setWorkerFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:max-w-[120px]"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:max-w-[150px]"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Staff Members</option>
                 {workersList.map(name => (
