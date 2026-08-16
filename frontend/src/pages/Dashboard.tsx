@@ -664,7 +664,7 @@ export const Dashboard: React.FC = () => {
               <select 
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:w-auto"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:w-[110px]"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Statuses</option>
                 <option value="Open" className="bg-white text-slate-800">Open</option>
@@ -696,7 +696,7 @@ export const Dashboard: React.FC = () => {
               <select 
                 value={workerFilter}
                 onChange={e => { setWorkerFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:w-[150px]"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:w-[130px]"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Staff Members</option>
                 {workersList.map(name => (
