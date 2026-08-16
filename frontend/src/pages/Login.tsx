@@ -41,6 +41,37 @@ export const Login: React.FC = () => {
   };
 
   useEffect(() => {
+    let scriptLoaded = false;
+    let clientIdVal = '';
+
+    const renderGoogleButton = () => {
+      if ((window as any).google && clientIdVal) {
+        const container = document.getElementById('google-signin-btn');
+        if (container) {
+          container.innerHTML = ''; // clear old button
+          const containerWidth = container.offsetWidth || 0;
+          const finalWidth = containerWidth >= 200 
+            ? Math.min(400, containerWidth) 
+            : Math.max(200, Math.min(380, window.innerWidth - 80));
+
+          (window as any).google.accounts.id.initialize({
+            client_id: clientIdVal,
+            callback: handleGoogleLogin,
+          });
+          (window as any).google.accounts.id.renderButton(
+            container,
+            { 
+              theme: 'outline', 
+              size: 'large', 
+              width: finalWidth.toString(), 
+              shape: 'rectangular', 
+              logo_alignment: 'center' 
+            }
+          );
+        }
+      }
+    };
+
     const initGoogleSignIn = async () => {
       try {
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -49,27 +80,14 @@ export const Login: React.FC = () => {
         const res = await fetch(`${apiBase}/auth/google-config`);
         const configData = await res.json();
         if (configData.clientId) {
+          clientIdVal = configData.clientId;
           const script = document.createElement('script');
           script.src = 'https://accounts.google.com/gsi/client';
           script.async = true;
           script.defer = true;
           script.onload = () => {
-            if ((window as any).google) {
-              (window as any).google.accounts.id.initialize({
-                client_id: configData.clientId,
-                callback: handleGoogleLogin,
-              });
-              (window as any).google.accounts.id.renderButton(
-                document.getElementById('google-signin-btn'),
-                { 
-                  theme: 'outline', 
-                  size: 'large', 
-                  width: '380', 
-                  shape: 'rectangular', 
-                  logo_alignment: 'center' 
-                }
-              );
-            }
+            scriptLoaded = true;
+            renderGoogleButton();
           };
           document.body.appendChild(script);
         }
@@ -79,6 +97,17 @@ export const Login: React.FC = () => {
     };
 
     initGoogleSignIn();
+
+    const handleResize = () => {
+      if (scriptLoaded) {
+        renderGoogleButton();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
