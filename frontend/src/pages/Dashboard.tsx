@@ -608,7 +608,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Grid of Stats Cards */}
-      <div className="grid grid-cols-5 gap-2 sm:gap-4">
+      <div className="grid grid-cols-6 sm:grid-cols-5 gap-3 sm:gap-4">
         {cards.map((card, i) => {
           const Icon = card.icon;
           const isActive = statusFilter === card.filterId;
@@ -616,21 +616,23 @@ export const Dashboard: React.FC = () => {
             <div 
               key={i} 
               onClick={() => { setStatusFilter(card.filterId); setCurrentPage(1); }}
-              className={`bg-gradient-to-br ${card.color} border p-2.5 sm:p-4 rounded-xl flex flex-col justify-between h-[84px] sm:h-[96px] transition-all duration-300 cursor-pointer select-none active:scale-[0.98] ${
+              className={`bg-gradient-to-br ${card.color} border p-4 rounded-xl flex flex-col justify-between h-[96px] transition-all duration-300 cursor-pointer select-none active:scale-[0.98] ${
+                i < 2 ? 'col-span-3' : 'col-span-2'
+              } sm:col-span-1 ${
                 isActive 
                   ? 'ring-4 ring-black/25 dark:ring-white/30 scale-[1.03] shadow-xl border-white/40 z-10' 
                   : 'hover:scale-[1.02] hover:shadow-md border-white/10'
               }`}
             >
               <div className="flex justify-between items-start">
-                <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider ${card.labelColor} line-clamp-1`}>{card.title}</span>
-                <div className="p-0.5 sm:p-1 rounded-md bg-white/15 backdrop-blur-xs text-white flex-shrink-0">
-                  <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${card.labelColor}`}>{card.title}</span>
+                <div className="p-1 rounded-md bg-white/15 backdrop-blur-xs text-white flex-shrink-0">
+                  <Icon className="w-3.5 h-3.5" />
                 </div>
               </div>
               <div className="flex items-baseline justify-between">
-                <span className={`text-lg sm:text-2xl font-extrabold tracking-tight ${card.textColor}`}>{card.value}</span>
-                <span className={`hidden sm:inline text-[8px] font-bold uppercase tracking-wider ${card.labelColor}`}>Live</span>
+                <span className={`text-2xl font-extrabold tracking-tight ${card.textColor}`}>{card.value}</span>
+                <span className={`text-[8px] font-bold uppercase tracking-wider ${card.labelColor}`}>Live</span>
               </div>
             </div>
           );
@@ -641,8 +643,8 @@ export const Dashboard: React.FC = () => {
       {/* Main Operations Control Panel: Google Sheets / Airtable style */}
       <div className="glass-panel rounded-2xl border border-slate-200 bg-white overflow-hidden flex flex-col min-w-0 w-full">
         {/* Table Toolbar */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2 flex-grow max-w-md">
+        <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 flex-grow max-w-md w-full">
             <div className="relative w-full">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input 
@@ -655,14 +657,14 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5 w-full sm:w-auto">
             {/* Status Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full">
               <Layers className="w-3.5 h-3.5 text-slate-500" />
               <select 
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Statuses</option>
                 <option value="Open" className="bg-white text-slate-800">Open</option>
@@ -674,12 +676,12 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Priority Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full">
               <Shield className="w-3.5 h-3.5 text-slate-500" />
               <select 
                 value={priorityFilter}
                 onChange={e => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Priorities</option>
                 <option value="Low" className="bg-white text-slate-800">Low</option>
@@ -689,12 +691,12 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Worker Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 w-full">
               <UserCheck className="w-3.5 h-3.5 text-slate-500" />
               <select 
                 value={workerFilter}
                 onChange={e => { setWorkerFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 max-w-[120px]"
+                className="bg-transparent text-slate-700 text-xs focus:outline-none border-none cursor-pointer pr-1 w-full sm:max-w-[120px]"
               >
                 <option value="ALL" className="bg-white text-slate-800">All Staff Members</option>
                 {workersList.map(name => (
@@ -706,7 +708,7 @@ export const Dashboard: React.FC = () => {
             {/* Export CSV */}
             <button 
               onClick={handleExportCSV}
-              className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary py-1.5 px-3.5 rounded-xl text-xs font-bold hover:bg-primary/20 transition-all uppercase tracking-wider"
+              className="flex items-center justify-center gap-1.5 bg-primary/10 border border-primary/20 text-primary py-1.5 px-3.5 rounded-xl text-xs font-bold hover:bg-primary/20 transition-all uppercase tracking-wider w-full sm:w-auto"
               title="Download filtered dataset to CSV"
             >
               <Download className="w-3.5 h-3.5" />
