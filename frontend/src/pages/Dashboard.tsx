@@ -608,7 +608,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Grid of Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-5 gap-2 sm:gap-4">
         {cards.map((card, i) => {
           const Icon = card.icon;
           const isActive = statusFilter === card.filterId;
@@ -616,21 +616,21 @@ export const Dashboard: React.FC = () => {
             <div 
               key={i} 
               onClick={() => { setStatusFilter(card.filterId); setCurrentPage(1); }}
-              className={`bg-gradient-to-br ${card.color} border p-4 rounded-xl flex flex-col justify-between h-[96px] transition-all duration-300 cursor-pointer select-none active:scale-[0.98] ${
+              className={`bg-gradient-to-br ${card.color} border p-2.5 sm:p-4 rounded-xl flex flex-col justify-between h-[84px] sm:h-[96px] transition-all duration-300 cursor-pointer select-none active:scale-[0.98] ${
                 isActive 
                   ? 'ring-4 ring-black/25 dark:ring-white/30 scale-[1.03] shadow-xl border-white/40 z-10' 
                   : 'hover:scale-[1.02] hover:shadow-md border-white/10'
               }`}
             >
               <div className="flex justify-between items-start">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${card.labelColor}`}>{card.title}</span>
-                <div className="p-1 rounded-md bg-white/15 backdrop-blur-xs text-white flex-shrink-0">
-                  <Icon className="w-3.5 h-3.5" />
+                <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider ${card.labelColor} line-clamp-1`}>{card.title}</span>
+                <div className="p-0.5 sm:p-1 rounded-md bg-white/15 backdrop-blur-xs text-white flex-shrink-0">
+                  <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </div>
               </div>
               <div className="flex items-baseline justify-between">
-                <span className={`text-2xl font-extrabold tracking-tight ${card.textColor}`}>{card.value}</span>
-                <span className={`text-[8px] font-bold uppercase tracking-wider ${card.labelColor}`}>Live</span>
+                <span className={`text-lg sm:text-2xl font-extrabold tracking-tight ${card.textColor}`}>{card.value}</span>
+                <span className={`hidden sm:inline text-[8px] font-bold uppercase tracking-wider ${card.labelColor}`}>Live</span>
               </div>
             </div>
           );
