@@ -9,9 +9,9 @@ const superAdminController = new SuperAdminController();
 router.use(authenticateJWT);
 router.use(requireRole(['SuperAdmin']));
 
-router.post('/orgs', (req, res, next) => superAdminController.createOrg(req, res, next));
-router.get('/orgs', (req, res, next) => superAdminController.listOrgs(req, res, next));
-router.patch('/orgs/:orgId/status', (req, res, next) => superAdminController.toggleOrgStatus(req, res, next));
-router.patch('/orgs/:orgId/plan', (req, res, next) => superAdminController.updateOrgPlan(req, res, next));
+router.post('/orgs', superAdminController.createOrg.bind(superAdminController));
+router.get('/orgs', superAdminController.listOrgs.bind(superAdminController));
+router.patch('/orgs/:orgId/status', superAdminController.toggleOrgStatus.bind(superAdminController));
+router.patch('/orgs/:orgId/plan', superAdminController.updateOrgPlan.bind(superAdminController));
 
 export default router;
